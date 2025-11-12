@@ -44,6 +44,7 @@ export async function PUT(
         const moodle_course_id = formData.get('moodle_course_id') as string
         const moodle_user_email = formData.get('moodle_user_email') as string
         const start_time = formData.get('start_time') as string
+        const end_time = formData.get('end_time') as string
         const duration = formData.get('duration') as string
 
         if (!name) {
@@ -59,6 +60,7 @@ export async function PUT(
             moodle_course_id: moodle_course_id || null,
             moodle_user_email: moodle_user_email || null,
             start_time: start_time ? new Date(start_time) : null,
+            end_time: end_time ? new Date(end_time) : null,
             duration: duration ? parseInt(duration) : null,
         }
 

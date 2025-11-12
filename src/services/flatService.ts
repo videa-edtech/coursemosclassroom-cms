@@ -3,8 +3,9 @@ import crypto from 'crypto';
 
 export interface CreateOrdinaryRoomRequest {
     title: string;
-    type: 'OneToOne' | 'SmallClass' | 'BigClass';
+    type: 'SmallClass';
     beginTime: number;
+    endTime: number;
     pmi: boolean;
     region: string;
     email: string;
@@ -31,13 +32,13 @@ export class FlatService {
     private baseURL: string;
 
     constructor() {
-        this.baseURL = process.env.FLAT_BASE_URL || 'https://flat-api.whiteboard.cn';
+        this.baseURL = process.env.FLAT_BACKEND_BASE_URL;
     }
 
     /**
      * Generate client key từ secret key
      */
-    private generateClientKey(secretKey: string): string {
+    public generateClientKey(secretKey: string): string {
         return crypto
             .createHash('md5')
             .update(secretKey + 'test')
@@ -49,8 +50,9 @@ export class FlatService {
      */
     async createRoom(roomData: {
         title: string;
-        type: 'OneToOne' | 'SmallClass' | 'BigClass';
+        type: 'SmallClass';
         beginTime: number;
+        endTime: number;
         email: string;
     }, customer: any): Promise<FlatRoom> {
         try {
@@ -61,6 +63,7 @@ export class FlatService {
                 title: roomData.title,
                 type: roomData.type,
                 beginTime: roomData.beginTime,
+                endTime: roomData.endTime,
                 pmi: false,
                 region: 'cn-hz',
                 email: roomData.email,
@@ -82,10 +85,8 @@ export class FlatService {
             console.log('Flat.io room created successfully:', response.data);
 
             return {
-                roomUUID: response.data.roomUUID,
-                roomId: response.data.roomId,
-                joinUrl: response.data.joinUrl,
-                createdAt: response.data.createdAt
+                roomUUID: response.data.data.roomUUID,
+                joinUrl: process.env.FLAT_CMS_BASE_URL + '/join/'+response.data.data.roomUUID,
             };
 
         } catch (error: any) {

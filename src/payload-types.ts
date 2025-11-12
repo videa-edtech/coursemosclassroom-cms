@@ -248,6 +248,7 @@ export interface Meeting {
   flat_room_id?: string | null;
   flat_room_link?: string | null;
   start_time?: string | null;
+  end_time?: string | null;
   /**
    * Thời lượng (phút)
    */
@@ -468,6 +469,7 @@ export interface MeetingsSelect<T extends boolean = true> {
   flat_room_id?: T;
   flat_room_link?: T;
   start_time?: T;
+  end_time?: T;
   duration?: T;
   updatedAt?: T;
   createdAt?: T;

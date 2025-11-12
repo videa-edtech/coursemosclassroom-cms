@@ -45,7 +45,11 @@ export const Meetings: CollectionConfig = {
         },
         {
             name: 'start_time',
-            type: 'date',
+            type: 'text',
+        },
+        {
+            name: 'end_time',
+            type: 'text',
         },
         {
             name: 'duration',
