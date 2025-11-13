@@ -8,7 +8,7 @@ import { Navbar } from "@/components/blocks/navbar";
 import { StyleGlideProvider } from "@/components/styleglide-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import "@/styles/globals.css";
-
+import { AuthProvider } from '@/contexts/AuthContext';
 const dmSans = localFont({
   src: [
     {
@@ -140,6 +140,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${dmSans.variable} ${inter.variable} antialiased`}>
+      <AuthProvider>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
@@ -151,6 +152,7 @@ export default function RootLayout({
           <main className="">{children}</main>
           <Footer />
         </ThemeProvider>
+      </AuthProvider>
       </body>
     </html>
   );
