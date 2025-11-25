@@ -1,3 +1,4 @@
+// collections/Invoices.ts
 import type { CollectionConfig } from 'payload'
 
 export const Invoices: CollectionConfig = {
@@ -8,8 +9,8 @@ export const Invoices: CollectionConfig = {
     },
     access: {
         read: ({ req }) => true,
-        create: ({ req }) => true,
-        update: ({ req }) => true,
+        create: ({ req }) => !!req.user,
+        update: ({ req }) => !!req.user,
         delete: ({ req }) => !!req.user,
     },
     fields: [
@@ -45,23 +46,44 @@ export const Invoices: CollectionConfig = {
             type: 'relationship',
             relationTo: 'plans',
             required: true,
+            // Thêm validate function để đảm bảo plan hợp lệ
+            validate: (value, { operation }) => {
+                if (operation === 'create' && !value) {
+                    return 'Plan is required';
+                }
+                return true;
+            },
         },
         {
             name: 'amount',
             type: 'number',
             required: true,
+            min: 0,
         },
         {
             name: 'currency',
             type: 'select',
-            options: ['USD', 'EUR', 'VND'],
+            options: [
+                { label: 'USD', value: 'USD' },
+                { label: 'EUR', value: 'EUR' },
+                { label: 'VND', value: 'VND' }
+            ],
             defaultValue: 'USD',
+            required: true,
         },
         {
             name: 'status',
             type: 'select',
-            options: ['draft', 'pending', 'paid', 'failed', 'refunded', 'cancelled'],
+            options: [
+                { label: 'Draft', value: 'draft' },
+                { label: 'Pending', value: 'pending' },
+                { label: 'Paid', value: 'paid' },
+                { label: 'Failed', value: 'failed' },
+                { label: 'Refunded', value: 'refunded' },
+                { label: 'Cancelled', value: 'cancelled' }
+            ],
             defaultValue: 'draft',
+            required: true,
         },
         {
             name: 'billingPeriod',
@@ -78,6 +100,7 @@ export const Invoices: CollectionConfig = {
                     required: true,
                 },
             ],
+            required: true,
         },
         {
             name: 'dueDate',
@@ -91,42 +114,26 @@ export const Invoices: CollectionConfig = {
         {
             name: 'items',
             type: 'array',
-            admin: {
-                description: 'Add invoice line items',
-                initCollapsed: true, // Thu gọn array mặc định
-            },
+            required: true,
+            minRows: 1,
             fields: [
                 {
                     name: 'description',
                     type: 'text',
                     required: true,
-                    admin: {
-                        placeholder: 'Item description',
-                    },
                 },
                 {
                     name: 'amount',
                     type: 'number',
                     required: true,
-                    admin: {
-                        placeholder: '0.00',
-                    },
+                    min: 0,
                 },
                 {
                     name: 'quantity',
                     type: 'number',
                     required: true,
+                    min: 1,
                     defaultValue: 1,
-                    admin: {
-                        placeholder: '1',
-                    },
-                },
-                {
-                    name: 'metadata',
-                    type: 'json',
-                    admin: {
-                        description: 'Additional item data (optional)',
-                    },
                 },
             ],
         },
@@ -134,6 +141,7 @@ export const Invoices: CollectionConfig = {
             name: 'subtotal',
             type: 'number',
             required: true,
+            min: 0,
             admin: {
                 readOnly: true,
                 description: 'Auto-calculated from items',
@@ -143,38 +151,67 @@ export const Invoices: CollectionConfig = {
             name: 'taxAmount',
             type: 'number',
             defaultValue: 0,
-            admin: {
-                description: 'Tax amount',
-            },
+            min: 0,
         },
         {
             name: 'totalAmount',
             type: 'number',
             required: true,
+            min: 0,
             admin: {
                 readOnly: true,
                 description: 'Auto-calculated total',
             },
         },
         {
-            name: 'description',
+            name: 'notes',
             type: 'textarea',
-            admin: {
-                placeholder: 'Additional invoice notes...',
-            },
-        },
-        {
-            name: 'metadata',
-            type: 'json',
-            admin: {
-                description: 'Additional invoice data',
-            },
         },
     ],
     hooks: {
         beforeValidate: [
-            ({ data, operation }) => {
+            async ({ data, req, operation }) => {
+                console.log('🔧 Invoice beforeValidate:', {
+                    data: data ? {
+                        customer: data.customer,
+                        subscription: data.subscription,
+                        plan: data.plan,
+                        amount: data.amount
+                    } : 'No data'
+                });
+
                 if (data) {
+                    // Extract IDs từ relationship objects
+                    if (data.customer && typeof data.customer === 'object') {
+                        data.customer = data.customer.id || data.customer;
+                    }
+                    if (data.subscription && typeof data.subscription === 'object') {
+                        data.subscription = data.subscription.id || data.subscription;
+                    }
+                    if (data.plan && typeof data.plan === 'object') {
+                        data.plan = data.plan.id || data.plan;
+                    }
+
+                    // Kiểm tra plan có tồn tại không
+                    if (data.plan && operation === 'create') {
+                        try {
+                            const plan = await req.payload.findByID({
+                                collection: 'plans',
+                                id: data.plan.toString(),
+                            });
+
+                            if (!plan) {
+                                console.error('❌ Plan not found:', data.plan);
+                                throw new Error(`Plan with ID ${data.plan} not found`);
+                            }
+
+                            console.log('✅ Plan validated:', plan.name);
+                        } catch (error) {
+                            console.error('❌ Error validating plan:', error);
+                            throw new Error(`Invalid plan: ${error.message}`);
+                        }
+                    }
+
                     // Auto-calculate totals từ items
                     if (data.items && Array.isArray(data.items)) {
                         const subtotal = data.items.reduce((sum: number, item: any) => {
@@ -187,9 +224,16 @@ export const Invoices: CollectionConfig = {
                         data.totalAmount = subtotal + (Number(data.taxAmount) || 0);
 
                         // Đảm bảo amount bằng totalAmount
-                        if (!data.amount || operation === 'create') {
+                        if (!data.amount || data.amount === 0) {
                             data.amount = data.totalAmount;
                         }
+                    }
+
+                    // Set default values if not provided
+                    if (!data.dueDate) {
+                        const dueDate = new Date();
+                        dueDate.setDate(dueDate.getDate() + 7);
+                        data.dueDate = dueDate.toISOString();
                     }
                 }
                 return data;
@@ -197,13 +241,15 @@ export const Invoices: CollectionConfig = {
         ],
 
         beforeChange: [
-            ({ data, operation, originalDoc }) => {
-                if (operation === 'update') {
-                    // Khi update, giữ nguyên items nếu không được cung cấp
-                    if (!data.items && originalDoc?.items) {
-                        data.items = originalDoc.items;
-                    }
-                }
+            async ({ data, operation, req }) => {
+                console.log('🔧 Invoice beforeChange:', {
+                    operation,
+                    data: data ? {
+                        customer: data.customer,
+                        subscription: data.subscription,
+                        plan: data.plan
+                    } : 'No data'
+                });
 
                 if (operation === 'create') {
                     // Đảm bảo có ít nhất một item mặc định
@@ -217,17 +263,92 @@ export const Invoices: CollectionConfig = {
                         ];
                     }
 
-                    // Auto-calculate nếu chưa có
-                    if (data.items && (!data.subtotal || !data.totalAmount)) {
-                        const subtotal = data.items.reduce((sum: number, item: any) => {
-                            return sum + ((item.amount || 0) * (item.quantity || 1));
-                        }, 0);
+                    // Set default billing period từ subscription nếu không được cung cấp
+                    if (!data.billingPeriod && data.subscription) {
+                        try {
+                            console.log('🔍 Fetching subscription for billing period:', data.subscription);
+                            const subscription = await req.payload.findByID({
+                                collection: 'subscriptions',
+                                id: data.subscription,
+                            });
 
-                        data.subtotal = subtotal;
-                        data.totalAmount = subtotal + (data.taxAmount || 0);
+                            if (subscription) {
+                                data.billingPeriod = {
+                                    start: subscription.startDate,
+                                    end: subscription.endDate,
+                                };
+                                console.log('✅ Set billing period from subscription:', data.billingPeriod);
+                            }
+                        } catch (error) {
+                            console.error('❌ Error fetching subscription for billing period:', error);
+                            // Fallback to default billing period
+                            const startDate = new Date();
+                            const endDate = new Date();
+                            endDate.setMonth(endDate.getMonth() + 1);
+
+                            data.billingPeriod = {
+                                start: startDate.toISOString(),
+                                end: endDate.toISOString(),
+                            };
+                        }
+                    }
+
+                    // Set default due date nếu không được cung cấp
+                    if (!data.dueDate) {
+                        const dueDate = new Date();
+                        dueDate.setDate(dueDate.getDate() + 7);
+                        data.dueDate = dueDate.toISOString();
                     }
                 }
                 return data;
+            },
+        ],
+
+        afterChange: [
+            async ({ doc, operation, req }) => {
+                console.log(`🔄 Invoice afterChange: ${doc.invoiceNumber}, Status: ${doc.status}, Operation: ${operation}`);
+
+                // Khi invoice được chuyển sang trạng thái paid, cập nhật subscription status
+                if (doc.status === 'paid' && doc.subscription) {
+                    try {
+                        console.log(`💰 Invoice paid, activating subscription: ${doc.subscription}`);
+
+                        await req.payload.update({
+                            collection: 'subscriptions',
+                            id: doc.subscription,
+                            data: {
+                                status: 'active',
+                                startDate: doc.billingPeriod.start,
+                                endDate: doc.billingPeriod.end,
+                                currentPeriodStart: doc.billingPeriod.start,
+                                currentPeriodEnd: doc.billingPeriod.end,
+                            },
+                        });
+
+                        console.log(`✅ Subscription ${doc.subscription} activated for paid invoice ${doc.invoiceNumber}`);
+                    } catch (error) {
+                        console.error('❌ Error updating subscription status:', error);
+                    }
+                }
+
+                // Khi invoice bị cancelled hoặc failed, cập nhật subscription status
+                if ((doc.status === 'cancelled' || doc.status === 'failed') && doc.subscription) {
+                    try {
+                        console.log(`🚫 Invoice ${doc.status}, deactivating subscription: ${doc.subscription}`);
+
+                        await req.payload.update({
+                            collection: 'subscriptions',
+                            id: doc.subscription,
+                            data: {
+                                status: 'inactive',
+                            },
+                        });
+
+                        console.log(`✅ Subscription ${doc.subscription} deactivated for ${doc.status} invoice ${doc.invoiceNumber}`);
+                    } catch (error) {
+                        console.error('❌ Error deactivating subscription:', error);
+                    }
+                }
             },
         ],
     },

@@ -6,9 +6,12 @@ export interface SubscriptionCheck {
     plan?: Plan;
     usage?: {
         roomsCreated: number;
-        totalDuration: number;
+        totalMinutes: number;
         maxRoomsPerMonth: number;
+        maxMinutesPerMonth: number;
         maxDurationPerRoom: number;
+        remainingRooms: number;
+        remainingMinutes: number;
     };
     canCreateRoom: boolean;
     limitations?: string[];

@@ -1,3 +1,4 @@
+// components/RoomManagement.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -203,6 +204,13 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
             return;
         }
 
+        // Check monthly minutes quota
+        const remainingMinutes = subscriptionCheck.usage?.remainingMinutes || 0;
+        if (duration > remainingMinutes) {
+            setError(`Room duration (${duration} minutes) exceeds your remaining monthly quota (${remainingMinutes} minutes)`);
+            return;
+        }
+
         if (endTime - beginTime > 24 * 60 * 60 * 1000) {
             setError('Room duration cannot exceed 24 hours');
             return;
@@ -356,7 +364,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
         return rooms.filter(room => getRoomStatus(room) === status).length;
     };
 
-    // Subscription usage display
+    // Subscription usage display với thông tin minutes
     const renderSubscriptionInfo = () => {
         if (!subscriptionCheck?.hasActiveSubscription) {
             return (
@@ -392,9 +400,10 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                             <p className="text-red-700 mt-1">
                                 {subscriptionCheck.limitations?.join(', ')}
                             </p>
-                            <p className="text-red-600 text-sm mt-2">
-                                Current usage: {subscriptionCheck.usage?.roomsCreated} / {subscriptionCheck.usage?.maxRoomsPerMonth} rooms this month
-                            </p>
+                            <div className="text-red-600 text-sm mt-2 space-y-1">
+                                <p>Rooms: {subscriptionCheck.usage?.roomsCreated} / {subscriptionCheck.usage?.maxRoomsPerMonth}</p>
+                                <p>Minutes: {subscriptionCheck.usage?.totalMinutes} / {subscriptionCheck.usage?.maxMinutesPerMonth}</p>
+                            </div>
                         </div>
                         <button
                             onClick={() => window.open('/pricing', '_blank')}
@@ -414,12 +423,17 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                         <h3 className="text-lg font-semibold text-green-800">
                             {subscriptionCheck.plan?.name} Plan
                         </h3>
-                        <p className="text-green-700 mt-1">
-                            Usage: {subscriptionCheck.usage?.roomsCreated} / {subscriptionCheck.usage?.maxRoomsPerMonth} rooms this month
-                        </p>
-                        <p className="text-green-600 text-sm mt-1">
-                            Max duration: {subscriptionCheck.usage?.maxDurationPerRoom} minutes per room
-                        </p>
+                        <div className="text-green-700 mt-1 space-y-1">
+                            <p>
+                                <strong>Rooms:</strong> {subscriptionCheck.usage?.remainingRooms} / {subscriptionCheck.usage?.maxRoomsPerMonth} remaining
+                            </p>
+                            <p>
+                                <strong>Minutes:</strong> {subscriptionCheck.usage?.remainingMinutes} / {subscriptionCheck.usage?.maxMinutesPerMonth} remaining
+                            </p>
+                            <p className="text-green-600 text-sm">
+                                <strong>Max duration per room:</strong> {subscriptionCheck.usage?.maxDurationPerRoom} minutes
+                            </p>
+                        </div>
                     </div>
                     <button
                         onClick={() => window.open('/pricing', '_blank')}
@@ -508,6 +522,9 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                         >
                             + Create New Room
                         </button>
+                        <div className="mt-2 text-sm text-gray-600">
+                            Remaining: {subscriptionCheck.usage?.remainingRooms} rooms, {subscriptionCheck.usage?.remainingMinutes} minutes
+                        </div>
                     </div>
                 )}
 
@@ -597,9 +614,12 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                                     : 'N/A'
                                 }
                                 </p>
-                                <p className="text-sm text-gray-600 mt-1">
-                                    <strong>Plan Limit:</strong> {subscriptionCheck.usage?.maxDurationPerRoom} minutes per room
-                                </p>
+                                <div className="text-sm text-gray-600 mt-1 space-y-1">
+                                    <p><strong>Plan Limits:</strong></p>
+                                    <p>- Max duration per room: {subscriptionCheck.usage?.maxDurationPerRoom} minutes</p>
+                                    <p>- Remaining minutes: {subscriptionCheck.usage?.remainingMinutes} minutes</p>
+                                    <p>- Remaining rooms: {subscriptionCheck.usage?.remainingRooms} rooms</p>
+                                </div>
                             </div>
 
                             {error && (
@@ -730,6 +750,9 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                                                     </div>
                                                     <div>
                                                         <strong>End:</strong> {formatDate(room.end_time)}
+                                                    </div>
+                                                    <div>
+                                                        <strong>Duration:</strong> {Math.round((new Date(room.end_time).getTime() - new Date(room.begin_time).getTime()) / (60 * 1000))} minutes
                                                     </div>
                                                 </div>
                                             </div>

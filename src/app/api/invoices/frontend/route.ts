@@ -43,6 +43,18 @@ export async function POST(request: NextRequest) {
             data,
         });
 
+        const customer = await payload.findByID({
+            collection: 'customers',
+            id: result.customer as string,
+        });
+
+        if (!customer) {
+            return NextResponse.json(
+                { error: 'Customer not found' },
+                { status: 404 }
+            );
+        }
+        console.log(`Sending invoice ${result.invoiceNumber} to ${customer.email}`);
         return NextResponse.json({ doc: result });
     } catch (error) {
         console.error('Error creating invoice:', error);

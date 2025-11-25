@@ -1,3 +1,4 @@
+// components/Pricing.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,14 +13,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Types từ collection Plans
-interface PlanFeature {
-  feature: string;
-  included: boolean;
-  limit?: number;
-  unit?: string;
-}
-
 interface Plan {
   id: string;
   name: string;
@@ -28,13 +21,12 @@ interface Plan {
   price: number;
   currency: string;
   billingPeriod: 'monthly' | 'quarterly' | 'yearly';
-  features: PlanFeature[];
   maxParticipants: number;
   maxDuration: number;
+  maxRoomsPerMonth: number;
+  maxMinutesPerMonth: number;
   recordingStorage: number;
-  maxRooms: number;
   whiteboard: boolean;
-  totalMinutes: number;
   status: 'active' | 'inactive' | 'archived';
   sortOrder: number;
 }
@@ -86,12 +78,11 @@ export const Pricing = ({ className }: PricingProps) => {
     password: '',
   });
 
-  // Fetch plans từ API
   useEffect(() => {
     const fetchPlans = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/plans?status=active&sort=sortOrder');
+        const response = await fetch('/api/plans?where[status][equals]=active&sort=sortOrder');
 
         if (!response.ok) {
           throw new Error('Failed to fetch plans');
@@ -110,7 +101,6 @@ export const Pricing = ({ className }: PricingProps) => {
     fetchPlans();
   }, []);
 
-  // Tự động điền thông tin khi user đã đăng nhập
   useEffect(() => {
     if (user) {
       setFormData(prev => ({
@@ -124,8 +114,7 @@ export const Pricing = ({ className }: PricingProps) => {
   const calculatePrice = (plan: Plan) => {
     const basePrice = plan.price;
     if (isAnnual && plan.billingPeriod === 'monthly') {
-      // Giảm 20% khi thanh toán hàng năm cho plan monthly
-      return basePrice * 12 * 0.8;
+      return basePrice * 12 * 0.8; // 20% discount for annual
     }
     return basePrice;
   };
@@ -149,32 +138,12 @@ export const Pricing = ({ className }: PricingProps) => {
   const getFeaturesList = (plan: Plan): string[] => {
     const features: string[] = [];
 
-    // Thêm các tính năng cơ bản
-    features.push(`Max Participants: ${plan.maxParticipants}`);
-
-    if (plan.maxDuration === 0) {
-      features.push('Meeting Duration: Unlimited');
-    } else {
-      features.push(`Meeting Duration: ${plan.maxDuration} minutes`);
-    }
-
-    features.push(`Recording Storage: ${plan.recordingStorage}GB`);
-    features.push(`Concurrent Rooms: ${plan.maxRooms}`);
-    features.push(`Total Minutes: ${plan.totalMinutes} minutes`);
-
-    // Thêm các tính năng boolean
-    if (plan.whiteboard) features.push('Whiteboard');
-
-    // Thêm features từ array features
-    plan.features?.forEach(feat => {
-      if (feat.included) {
-        let featureText = feat.feature;
-        if (feat.limit && feat.unit) {
-          featureText += `: ${feat.limit} ${feat.unit}`;
-        }
-        features.push(featureText);
-      }
-    });
+    features.push(`${plan.maxParticipants} participants per room`);
+    features.push(`${plan.maxDuration === 0 ? 'Unlimited' : plan.maxDuration} minutes per room`);
+    features.push(`${plan.maxRoomsPerMonth} rooms per month`);
+    features.push(`${plan.maxMinutesPerMonth} total minutes per month`);
+    features.push(`${plan.recordingStorage}GB recording storage`);
+    if (plan.whiteboard) features.push('Interactive whiteboard');
 
     return features;
   };
@@ -190,7 +159,6 @@ export const Pricing = ({ className }: PricingProps) => {
       } : {})
     }));
 
-    // Nếu đã đăng nhập thì hiển thị form đăng ký, nếu chưa thì hiển thị form đăng nhập
     setDialogMode(user ? 'register' : 'login');
     setIsDialogOpen(true);
   };
@@ -207,11 +175,10 @@ export const Pricing = ({ className }: PricingProps) => {
       ...prev,
       [field]: value
     }));
-    setLoginError(null); // Clear error when user starts typing
+    setLoginError(null);
   };
 
   const showToast = (title: string, description: string, variant: 'default' | 'destructive' = 'default') => {
-    // Simple toast implementation - you can replace this with your toast library
     const toast = document.createElement('div');
     toast.className = `fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${
         variant === 'destructive' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
@@ -239,7 +206,6 @@ export const Pricing = ({ className }: PricingProps) => {
       setIsSubmitting(true);
       await login(loginForm.email, loginForm.password);
 
-      // Login successful, switch to registration form
       setDialogMode('register');
       showToast("Login successful!", "You can now complete your subscription.");
 
@@ -250,33 +216,19 @@ export const Pricing = ({ className }: PricingProps) => {
     }
   };
 
-  // Hàm tìm hoặc tạo customer
   const findOrCreateCustomer = async (email: string, name: string) => {
     try {
-      console.log('Finding customer by email:', email);
-
-      // Tìm customer theo email
-      const findResponse = await fetch('/api/customers/find-by-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
+      // Try to find existing customer
+      const findResponse = await fetch('/api/customers?where[email][equals]=' + encodeURIComponent(email));
 
       if (findResponse.ok) {
         const findData = await findResponse.json();
-        console.log('Find customer response:', findData);
-
-        if (findData.customerId) {
-          console.log('Customer found:', findData.customerId);
-          return { id: findData.customerId, ...findData };
+        if (findData.docs && findData.docs.length > 0) {
+          return findData.docs[0];
         }
       }
 
-      console.log('Customer not found, creating new customer...');
-
-      // Nếu không tìm thấy, tạo customer mới
+      // Create new customer
       const createResponse = await fetch('/api/customers', {
         method: 'POST',
         headers: {
@@ -287,19 +239,17 @@ export const Pricing = ({ className }: PricingProps) => {
           email: email,
           phone: formData.phone,
           organization: formData.organization,
-          organization_description: formData.organizationDescription,
+          organizationDescription: formData.organizationDescription,
           status: 'active'
         }),
       });
 
       if (!createResponse.ok) {
         const errorData = await createResponse.json();
-        console.error('Create customer error:', errorData);
-        throw new Error(errorData.error || 'Failed to create customer');
+        throw new Error(errorData.message || errorData.error || 'Failed to create customer');
       }
 
       const customerData = await createResponse.json();
-      console.log('Customer created:', customerData.doc);
       return customerData.doc;
 
     } catch (error) {
@@ -311,10 +261,6 @@ export const Pricing = ({ className }: PricingProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log('Starting subscription process...');
-    console.log('Form data:', formData);
-    console.log('Selected plan:', selectedPlan);
-
     if (!formData.name || !formData.email || !formData.planId) {
       showToast("Missing information", "Please fill in all required fields.", "destructive");
       return;
@@ -323,64 +269,52 @@ export const Pricing = ({ className }: PricingProps) => {
     setIsSubmitting(true);
 
     try {
-      let customerId: string;
+      // Find or create customer
+      const customerData = await findOrCreateCustomer(formData.email, formData.name);
+      const customerId = customerData.id;
 
-      // Tìm hoặc tạo customer
-      console.log('Finding or creating customer...');
-      const customerData = await findOrCreateCustomer(
-          formData.email,
-          formData.name
-      );
-      customerId = customerData.id;
-      console.log('Customer ID:', customerId);
-
-      // Tính toán ngày kết thúc dựa trên billing period
+      // Calculate dates
       const startDate = new Date();
       const endDate = new Date();
 
       if (isAnnual && selectedPlan?.billingPeriod === 'monthly') {
-        endDate.setFullYear(endDate.getFullYear() + 1); // 1 year for annual billing
-        console.log('Annual billing - End date:', endDate.toISOString());
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      } else if (selectedPlan?.billingPeriod === 'yearly') {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      } else if (selectedPlan?.billingPeriod === 'quarterly') {
+        endDate.setMonth(endDate.getMonth() + 3);
       } else {
-        endDate.setMonth(endDate.getMonth() + 1); // 1 month for monthly billing
-        console.log('Monthly billing - End date:', endDate.toISOString());
+        endDate.setMonth(endDate.getMonth() + 1);
       }
 
-      // Tạo subscription với đầy đủ thông tin
-      const subscriptionPayload = {
-        customer: customerId,
-        plan: formData.planId,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        status: 'pending',
-        autoRenew: true,
-      };
-
-      console.log('Creating subscription with payload:', subscriptionPayload);
-
+      // Create subscription
       const subscriptionResponse = await fetch('/api/subscriptions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(subscriptionPayload),
+        body: JSON.stringify({
+          customer: customerId,
+          plan: formData.planId,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          status: 'pending',
+          autoRenew: true,
+        }),
       });
 
-      const responseData = await subscriptionResponse.json();
-      console.log('Subscription response:', responseData);
+      const subscriptionData = await subscriptionResponse.json();
 
       if (!subscriptionResponse.ok) {
-        throw new Error(responseData.error || 'Failed to create subscription');
+        throw new Error(subscriptionData.message || subscriptionData.error || 'Failed to create subscription');
       }
 
       showToast(
           "Registration successful!",
-          user
-              ? "Your subscription has been created successfully!"
-              : "Your account has been created. Please check your email for further instructions."
+          "Your subscription has been created. Please check your email for invoice details."
       );
 
-      // Reset form và đóng dialog
+      // Reset form
       setFormData({
         name: user?.name || '',
         email: user?.email || '',
@@ -392,7 +326,7 @@ export const Pricing = ({ className }: PricingProps) => {
       setIsDialogOpen(false);
       setSelectedPlan(null);
 
-      // Redirect đến trang thank you hoặc dashboard
+      // Redirect
       setTimeout(() => {
         router.push(user ? '/dashboard' : '/thank-you');
       }, 2000);
@@ -417,7 +351,6 @@ export const Pricing = ({ className }: PricingProps) => {
 
   const switchToLogin = () => {
     setDialogMode('login');
-    // Pre-fill email from registration form if available
     if (formData.email) {
       setLoginForm(prev => ({ ...prev, email: formData.email }));
     }
@@ -427,7 +360,10 @@ export const Pricing = ({ className }: PricingProps) => {
     return (
         <section className={cn("py-28 lg:py-32", className)}>
           <div className="container max-w-5xl">
-            <div className="text-center">Loading plans...</div>
+            <div className="text-center flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              Loading plans...
+            </div>
           </div>
         </section>
     );
@@ -447,7 +383,7 @@ export const Pricing = ({ className }: PricingProps) => {
     return (
         <section className={cn("py-28 lg:py-32", className)}>
           <div className="container max-w-5xl">
-            <div className="text-center">No plans available</div>
+            <div className="text-center">No plans available at the moment</div>
           </div>
         </section>
     );
@@ -466,7 +402,6 @@ export const Pricing = ({ className }: PricingProps) => {
               </p>
             </div>
 
-            {/* Billing Toggle - Chỉ hiển thị nếu có monthly plans */}
             {plans.some(plan => plan.billingPeriod === 'monthly') && (
                 <div className="mt-8 flex justify-center">
                   <div className="flex items-center gap-3 rounded-lg border p-1">
@@ -505,7 +440,7 @@ export const Pricing = ({ className }: PricingProps) => {
                     const displayPrice = calculatePrice(plan);
                     const billingPeriod = getBillingPeriodDisplay(plan);
                     const features = getFeaturesList(plan);
-                    const isPopular = plan.slug === "pro" || plan.sortOrder === 1;
+                    const isPopular = plan.slug === "professional" || plan.sortOrder === 2;
 
                     return (
                         <Card
@@ -538,11 +473,6 @@ export const Pricing = ({ className }: PricingProps) => {
                                 {isAnnual && plan.billingPeriod === 'monthly' && (
                                     <div className="text-muted-foreground text-sm">
                                       Billed annually
-                                    </div>
-                                )}
-                                {plan.billingPeriod !== 'monthly' && !isAnnual && (
-                                    <div className="text-muted-foreground text-sm">
-                                      Billed {plan.billingPeriod}
                                     </div>
                                 )}
                               </div>
@@ -604,7 +534,6 @@ export const Pricing = ({ className }: PricingProps) => {
                 </div>
 
                 {dialogMode === 'login' ? (
-                    // Login Form
                     <form onSubmit={handleLogin} className="p-6 space-y-4">
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 text-blue-800">
@@ -650,8 +579,8 @@ export const Pricing = ({ className }: PricingProps) => {
                       <div className="bg-muted p-4 rounded-lg">
                         <h4 className="font-semibold mb-2">Plan Summary</h4>
                         <p className="text-sm">
-                          <strong>{selectedPlan?.name}</strong> - {formatPrice(selectedPlan?.price || 0, selectedPlan?.currency || 'USD')}
-                          {isAnnual && selectedPlan?.billingPeriod === 'monthly' ? '/year (Save 20%)' : `/${selectedPlan?.billingPeriod}`}
+                          <strong>{selectedPlan?.name}</strong> - {formatPrice(calculatePrice(selectedPlan!), selectedPlan?.currency || 'USD')}
+                          {isAnnual && selectedPlan?.billingPeriod === 'monthly' ? '/year (Save 20%)' : `/${getBillingPeriodDisplay(selectedPlan!)}`}
                         </p>
                       </div>
 
@@ -695,7 +624,6 @@ export const Pricing = ({ className }: PricingProps) => {
                       </div>
                     </form>
                 ) : (
-                    // Registration Form
                     <form onSubmit={handleSubmit} className="p-6 space-y-4">
                       {user && (
                           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -717,9 +645,6 @@ export const Pricing = ({ className }: PricingProps) => {
                               required
                               disabled={isSubmitting || !!user}
                           />
-                          {user && (
-                              <p className="text-xs text-muted-foreground">This field is pre-filled from your account</p>
-                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -733,9 +658,6 @@ export const Pricing = ({ className }: PricingProps) => {
                               required
                               disabled={isSubmitting || !!user}
                           />
-                          {user && (
-                              <p className="text-xs text-muted-foreground">This field is pre-filled from your account</p>
-                          )}
                         </div>
                       </div>
 
@@ -748,9 +670,6 @@ export const Pricing = ({ className }: PricingProps) => {
                             placeholder="Enter your phone number"
                             disabled={isSubmitting}
                         />
-                        {user && (
-                            <p className="text-xs text-muted-foreground">Update your phone number (optional)</p>
-                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -762,9 +681,6 @@ export const Pricing = ({ className }: PricingProps) => {
                             placeholder="Enter your organization name"
                             disabled={isSubmitting}
                         />
-                        {user && (
-                            <p className="text-xs text-muted-foreground">Update your organization (optional)</p>
-                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -777,16 +693,16 @@ export const Pricing = ({ className }: PricingProps) => {
                             rows={3}
                             disabled={isSubmitting}
                         />
-                        {user && (
-                            <p className="text-xs text-muted-foreground">Update your organization description (optional)</p>
-                        )}
                       </div>
 
                       <div className="bg-muted p-4 rounded-lg">
                         <h4 className="font-semibold mb-2">Plan Summary</h4>
                         <p className="text-sm">
-                          <strong>{selectedPlan?.name}</strong> - {formatPrice(selectedPlan?.price || 0, selectedPlan?.currency || 'USD')}
-                          {isAnnual && selectedPlan?.billingPeriod === 'monthly' ? '/year (Save 20%)' : `/${selectedPlan?.billingPeriod}`}
+                          <strong>{selectedPlan?.name}</strong> - {formatPrice(calculatePrice(selectedPlan!), selectedPlan?.currency || 'USD')}
+                          {isAnnual && selectedPlan?.billingPeriod === 'monthly' ? '/year (Save 20%)' : `/${getBillingPeriodDisplay(selectedPlan!)}`}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          An invoice will be generated after registration
                         </p>
                       </div>
 

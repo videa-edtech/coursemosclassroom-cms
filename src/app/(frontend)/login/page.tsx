@@ -69,8 +69,8 @@ const Login = () => {
             <div className="container">
               <div className="flex flex-col items-center justify-center">
                 <div className="text-center">
-                  <p className="text-xl font-semibold">Đang chuyển hướng...</p>
-                  <p className="text-muted-foreground mt-2">Bạn đã đăng nhập, đang chuyển đến dashboard</p>
+                  <p className="text-xl font-semibold">Redirecting...</p>
+                  <p className="text-muted-foreground mt-2">You logged in, please wait to redirect dashboard</p>
                 </div>
               </div>
             </div>

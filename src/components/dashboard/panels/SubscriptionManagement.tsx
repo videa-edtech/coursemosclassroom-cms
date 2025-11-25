@@ -1,10 +1,10 @@
-// src/components/dashboard/panels/SubscriptionManagement.tsx
+// components/dashboard/panels/SubscriptionManagement.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { FlatUser } from '@/services/flat/types';
 import { useAuth } from "@/contexts/AuthContext";
-import { Check, X, Clock, AlertCircle, Calendar, CreditCard, Download } from 'lucide-react';
+import { Check, X, Clock, AlertCircle, Calendar, CreditCard, Download, Mail } from 'lucide-react';
 
 interface Subscription {
     id: string;
@@ -17,8 +17,9 @@ interface Subscription {
         billingPeriod: string;
         maxParticipants: number;
         maxDuration: number;
-        recordingStorage: number;
         maxRoomsPerMonth: number;
+        maxMinutesPerMonth: number;
+        recordingStorage: number;
     };
     startDate: string;
     endDate: string;
@@ -79,15 +80,13 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
         setLoading(true);
         setError(null);
         try {
-            // Tìm customer ID từ email
-            const customerResponse = await fetch(`/api/customers/frontend?where[email][equals]=${encodeURIComponent(user.email)}`);
+            const customerResponse = await fetch(`/api/customers?where[email][equals]=${encodeURIComponent(user.email)}`);
             if (customerResponse.ok) {
                 const customerData = await customerResponse.json();
                 if (customerData.docs && customerData.docs.length > 0) {
                     const customerId = customerData.docs[0].id;
 
-                    // Fetch subscriptions của customer
-                    const subscriptionResponse = await fetch(`/api/subscriptions/frontend?where[customer][equals]=${customerId}&sort=-createdAt`);
+                    const subscriptionResponse = await fetch(`/api/subscriptions?where[customer][equals]=${customerId}&sort=-createdAt&depth=1`);
                     if (subscriptionResponse.ok) {
                         const subscriptionData = await subscriptionResponse.json();
                         setSubscriptions(subscriptionData.docs || []);
@@ -106,15 +105,13 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
         if (!user?.token) return;
 
         try {
-            // Tìm customer ID từ email
-            const customerResponse = await fetch(`/api/customers/frontend?where[email][equals]=${encodeURIComponent(user.email)}`);
+            const customerResponse = await fetch(`/api/customers?where[email][equals]=${encodeURIComponent(user.email)}`);
             if (customerResponse.ok) {
                 const customerData = await customerResponse.json();
                 if (customerData.docs && customerData.docs.length > 0) {
                     const customerId = customerData.docs[0].id;
 
-                    // Fetch invoices của customer
-                    const invoiceResponse = await fetch(`/api/invoices/frontend?where[customer][equals]=${customerId}&sort=-createdAt`);
+                    const invoiceResponse = await fetch(`/api/invoices?where[customer][equals]=${customerId}&sort=-createdAt&depth=1`);
                     if (invoiceResponse.ok) {
                         const invoiceData = await invoiceResponse.json();
                         setInvoices(invoiceData.docs || []);
@@ -123,7 +120,6 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
             }
         } catch (error: any) {
             console.error('Error fetching invoices:', error);
-            // Không set error ở đây vì invoices không quan trọng bằng subscriptions
         }
     };
 
@@ -133,7 +129,7 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
             inactive: { color: 'bg-gray-100 text-gray-800', icon: Clock, label: 'Inactive' },
             cancelled: { color: 'bg-red-100 text-red-800', icon: X, label: 'Cancelled' },
             expired: { color: 'bg-orange-100 text-orange-800', icon: AlertCircle, label: 'Expired' },
-            pending: { color: 'bg-blue-100 text-blue-800', icon: Clock, label: 'Pending' },
+            pending: { color: 'bg-blue-100 text-blue-800', icon: Clock, label: 'Pending Payment' },
         };
 
         const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.inactive;
@@ -141,9 +137,9 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
 
         return (
             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-        <IconComponent className="w-3 h-3" />
+                <IconComponent className="w-3 h-3" />
                 {config.label}
-      </span>
+            </span>
         );
     };
 
@@ -162,9 +158,9 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
 
         return (
             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-        <IconComponent className="w-3 h-3" />
+                <IconComponent className="w-3 h-3" />
                 {config.label}
-      </span>
+            </span>
         );
     };
 
@@ -183,13 +179,39 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
         }).format(amount);
     };
 
+    const handlePayInvoice = async (invoiceId: string) => {
+        try {
+            const response = await fetch(`/api/invoices/${invoiceId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    status: 'paid',
+                    paidDate: new Date().toISOString(),
+                }),
+            });
+
+            if (response.ok) {
+                alert('Invoice paid successfully! Your subscription will be activated.');
+                fetchInvoices();
+                fetchSubscriptions(); // Refresh to see updated subscription status
+            } else {
+                throw new Error('Failed to pay invoice');
+            }
+        } catch (error) {
+            console.error('Error paying invoice:', error);
+            alert('Failed to pay invoice');
+        }
+    };
+
     const handleCancelSubscription = async (subscriptionId: string) => {
         if (!confirm('Are you sure you want to cancel this subscription? This action cannot be undone.')) {
             return;
         }
 
         try {
-            const response = await fetch(`/api/subscriptions/frontend/${subscriptionId}`, {
+            const response = await fetch(`/api/subscriptions/${subscriptionId}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -202,7 +224,7 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
 
             if (response.ok) {
                 alert('Subscription cancelled successfully');
-                fetchSubscriptions(); // Refresh data
+                fetchSubscriptions();
             } else {
                 throw new Error('Failed to cancel subscription');
             }
@@ -212,46 +234,29 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
         }
     };
 
-    const handleRenewSubscription = async (subscriptionId: string) => {
-        try {
-            const response = await fetch(`/api/subscriptions/frontend/${subscriptionId}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    autoRenew: true,
-                    cancelAtPeriodEnd: false,
-                }),
-            });
-
-            if (response.ok) {
-                alert('Subscription renewed successfully');
-                fetchSubscriptions(); // Refresh data
-            } else {
-                throw new Error('Failed to renew subscription');
-            }
-        } catch (error) {
-            console.error('Error renewing subscription:', error);
-            alert('Failed to renew subscription');
-        }
-    };
-
     const downloadInvoice = (invoice: Invoice) => {
-        // Tạo PDF invoice (đơn giản)
         const invoiceContent = `
-      INVOICE: ${invoice.invoiceNumber}
-      Date: ${formatDate(invoice.createdAt)}
-      Due Date: ${formatDate(invoice.dueDate)}
-      Status: ${invoice.status.toUpperCase()}
-      
-      Description: ${invoice.items[0]?.description || 'Subscription'}
-      Amount: ${formatCurrency(invoice.amount, invoice.currency)}
-      Tax: ${formatCurrency(invoice.taxAmount, invoice.currency)}
-      Total: ${formatCurrency(invoice.totalAmount, invoice.currency)}
-      
-      Thank you for your business!
-    `;
+INVOICE: ${invoice.invoiceNumber}
+Date: ${formatDate(invoice.createdAt)}
+Due Date: ${formatDate(invoice.dueDate)}
+Status: ${invoice.status.toUpperCase()}
+${invoice.paidDate ? `Paid Date: ${formatDate(invoice.paidDate)}` : ''}
+
+BILLING PERIOD:
+From: ${formatDate(invoice.billingPeriod.start)}
+To: ${formatDate(invoice.billingPeriod.end)}
+
+ITEMS:
+${invoice.items.map(item =>
+            `- ${item.description}: ${formatCurrency(item.amount, invoice.currency)} x ${item.quantity}`
+        ).join('\n')}
+
+Subtotal: ${formatCurrency(invoice.subtotal, invoice.currency)}
+Tax: ${formatCurrency(invoice.taxAmount, invoice.currency)}
+Total: ${formatCurrency(invoice.totalAmount, invoice.currency)}
+
+Thank you for your business!
+        `.trim();
 
         const blob = new Blob([invoiceContent], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
@@ -262,6 +267,23 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    };
+
+    const sendInvoiceEmail = async (invoiceId: string) => {
+        try {
+            const response = await fetch(`/api/invoices/${invoiceId}/send-email`, {
+                method: 'POST',
+            });
+
+            if (response.ok) {
+                alert('Invoice email sent successfully!');
+            } else {
+                throw new Error('Failed to send invoice email');
+            }
+        } catch (error) {
+            console.error('Error sending invoice email:', error);
+            alert('Failed to send invoice email');
+        }
     };
 
     if (loading) {
@@ -330,7 +352,7 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
                             <div className="mt-6">
                                 <a
                                     href="/pricing"
-                                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                                 >
                                     View Plans
                                 </a>
@@ -343,13 +365,13 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-3">
                                             <h3 className="text-lg font-semibold">
-                                                {typeof subscription.plan === 'object' ? subscription.plan.name : 'Plan'}
+                                                {subscription.plan.name}
                                             </h3>
                                             {getStatusBadge(subscription.status)}
-                                            {subscription.autoRenew && (
+                                            {subscription.autoRenew && subscription.status === 'active' && (
                                                 <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
-                          Auto Renew
-                        </span>
+                                                    Auto Renew
+                                                </span>
                                             )}
                                         </div>
 
@@ -357,43 +379,42 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
                                             <div className="flex items-center gap-2">
                                                 <Calendar className="w-4 h-4" />
                                                 <span>
-                          <strong>Start:</strong> {formatDate(subscription.startDate)}
-                        </span>
+                                                    <strong>Start:</strong> {formatDate(subscription.startDate)}
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Calendar className="w-4 h-4" />
                                                 <span>
-                          <strong>End:</strong> {formatDate(subscription.endDate)}
-                        </span>
+                                                    <strong>End:</strong> {formatDate(subscription.endDate)}
+                                                </span>
                                             </div>
                                             <div>
-                                                <strong>Price:</strong>{' '}
-                                                {typeof subscription.plan === 'object'
-                                                    ? formatCurrency(subscription.plan.price, subscription.plan.currency)
-                                                    : 'N/A'
-                                                }
+                                                <strong>Price:</strong> {formatCurrency(subscription.plan.price, subscription.plan.currency)}
                                             </div>
                                             <div>
-                                                <strong>Billing:</strong>{' '}
-                                                {typeof subscription.plan === 'object'
-                                                    ? subscription.plan.billingPeriod
-                                                    : 'N/A'
-                                                }
+                                                <strong>Billing:</strong> {subscription.plan.billingPeriod}
                                             </div>
                                         </div>
 
                                         {/* Plan Features */}
-                                        {typeof subscription.plan === 'object' && (
-                                            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                                                <div>Participants: {subscription.plan.maxParticipants}</div>
-                                                <div>Duration: {subscription.plan.maxDuration === 0 ? 'Unlimited' : `${subscription.plan.maxDuration}min`}</div>
-                                                <div>Storage: {subscription.plan.recordingStorage}GB</div>
-                                                <div>Rooms: {subscription.plan.maxRoomsPerMonth}</div>
-                                            </div>
-                                        )}
+                                        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                                            <div>Participants: {subscription.plan.maxParticipants}</div>
+                                            <div>Duration: {subscription.plan.maxDuration}min</div>
+                                            <div>Rooms/Month: {subscription.plan.maxRoomsPerMonth}</div>
+                                            <div>Minutes/Month: {subscription.plan.maxMinutesPerMonth}</div>
+                                            <div>Storage: {subscription.plan.recordingStorage}GB</div>
+                                        </div>
                                     </div>
 
                                     <div className="flex flex-col gap-2">
+                                        {subscription.status === 'pending' && (
+                                            <button
+                                                onClick={() => setActiveTab('invoices')}
+                                                className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+                                            >
+                                                Pay Invoice
+                                            </button>
+                                        )}
                                         {subscription.status === 'active' && !subscription.cancelAtPeriodEnd && (
                                             <button
                                                 onClick={() => handleCancelSubscription(subscription.id)}
@@ -404,7 +425,7 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
                                         )}
                                         {subscription.status === 'active' && subscription.cancelAtPeriodEnd && (
                                             <button
-                                                onClick={() => handleRenewSubscription(subscription.id)}
+                                                onClick={() => handleCancelSubscription(subscription.id)}
                                                 className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors text-sm"
                                             >
                                                 Renew Subscription
@@ -476,12 +497,27 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {formatDate(invoice.dueDate)}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                            {invoice.status === 'pending' && (
+                                                <button
+                                                    onClick={() => handlePayInvoice(invoice.id)}
+                                                    className="text-green-600 hover:text-green-900"
+                                                >
+                                                    Pay
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => downloadInvoice(invoice)}
                                                 className="text-blue-600 hover:text-blue-900"
                                             >
                                                 Download
+                                            </button>
+                                            <button
+                                                onClick={() => sendInvoiceEmail(invoice.id)}
+                                                className="text-purple-600 hover:text-purple-900"
+                                                title="Send via Email"
+                                            >
+                                                <Mail className="w-4 h-4" />
                                             </button>
                                         </td>
                                     </tr>

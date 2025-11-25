@@ -1,3 +1,4 @@
+// collections/Meetings.ts
 import type { CollectionConfig } from 'payload'
 
 export const Meetings: CollectionConfig = {
@@ -113,7 +114,7 @@ export const Meetings: CollectionConfig = {
                                 monthlyUsage: {
                                     month: currentMonth,
                                     roomsCreated: (subscription.monthlyUsage?.roomsCreated || 0) + 1,
-                                    totalDuration: (subscription.monthlyUsage?.totalDuration || 0) + doc.duration,
+                                    totalMinutes: (subscription.monthlyUsage?.totalMinutes || 0) + doc.duration,
                                     participantsCount: (subscription.monthlyUsage?.participantsCount || 0) + doc.participants_count,
                                 },
                             },

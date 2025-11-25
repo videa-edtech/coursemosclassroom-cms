@@ -232,22 +232,58 @@ export interface Subscription {
   plan: number | Plan;
   startDate: string;
   endDate: string;
+  /**
+   * Status will be automatically updated based on invoice payment and dates
+   */
   status?: ('active' | 'inactive' | 'cancelled' | 'expired' | 'pending') | null;
+  /**
+   * Automatically renew subscription at the end of billing period
+   */
   autoRenew?: boolean | null;
+  /**
+   * Start date of current billing period
+   */
   currentPeriodStart?: string | null;
+  /**
+   * End date of current billing period
+   */
   currentPeriodEnd?: string | null;
+  /**
+   * Cancel subscription at the end of current billing period
+   */
   cancelAtPeriodEnd?: boolean | null;
+  /**
+   * Current month usage statistics
+   */
   monthlyUsage?: {
+    /**
+     * Format: YYYY-MM
+     */
     month?: string | null;
+    /**
+     * Number of rooms created this month
+     */
     roomsCreated?: number | null;
-    totalDuration?: number | null;
+    /**
+     * Total minutes used this month
+     */
+    totalMinutes?: number | null;
+    /**
+     * Total participants count this month
+     */
     participantsCount?: number | null;
   };
+  /**
+   * Historical usage data for previous months
+   */
   usageHistory?:
     | {
-        month?: string | null;
+        /**
+         * Format: YYYY-MM
+         */
+        month: string;
         roomsCreated?: number | null;
-        totalDuration?: number | null;
+        totalMinutes?: number | null;
         participantsCount?: number | null;
         id?: string | null;
       }[]
@@ -323,62 +359,30 @@ export interface Invoice {
   subscription: number | Subscription;
   plan: number | Plan;
   amount: number;
-  currency?: ('USD' | 'EUR' | 'VND') | null;
-  status?: ('draft' | 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled') | null;
+  currency: 'USD' | 'EUR' | 'VND';
+  status: 'draft' | 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled';
   billingPeriod: {
     start: string;
     end: string;
   };
   dueDate: string;
   paidDate?: string | null;
-  /**
-   * Add invoice line items
-   */
-  items?:
-    | {
-        description: string;
-        amount: number;
-        quantity: number;
-        /**
-         * Additional item data (optional)
-         */
-        metadata?:
-          | {
-              [k: string]: unknown;
-            }
-          | unknown[]
-          | string
-          | number
-          | boolean
-          | null;
-        id?: string | null;
-      }[]
-    | null;
+  items: {
+    description: string;
+    amount: number;
+    quantity: number;
+    id?: string | null;
+  }[];
   /**
    * Auto-calculated from items
    */
   subtotal: number;
-  /**
-   * Tax amount
-   */
   taxAmount?: number | null;
   /**
    * Auto-calculated total
    */
   totalAmount: number;
-  description?: string | null;
-  /**
-   * Additional invoice data
-   */
-  metadata?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
+  notes?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -574,7 +578,7 @@ export interface SubscriptionsSelect<T extends boolean = true> {
     | {
         month?: T;
         roomsCreated?: T;
-        totalDuration?: T;
+        totalMinutes?: T;
         participantsCount?: T;
       };
   usageHistory?:
@@ -582,7 +586,7 @@ export interface SubscriptionsSelect<T extends boolean = true> {
     | {
         month?: T;
         roomsCreated?: T;
-        totalDuration?: T;
+        totalMinutes?: T;
         participantsCount?: T;
         id?: T;
       };
@@ -641,14 +645,12 @@ export interface InvoicesSelect<T extends boolean = true> {
         description?: T;
         amount?: T;
         quantity?: T;
-        metadata?: T;
         id?: T;
       };
   subtotal?: T;
   taxAmount?: T;
   totalAmount?: T;
-  description?: T;
-  metadata?: T;
+  notes?: T;
   updatedAt?: T;
   createdAt?: T;
 }

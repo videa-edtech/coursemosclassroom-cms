@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPayload } from 'payload';
+import { getPayloadClient } from '@/payload/payloadClient';
 import config from "@payload-config";
 export async function POST(request: NextRequest) {
     try {
-        const payload = await getPayload({config});
+        const payload = await getPayloadClient();
         const { subscriptionId, duration, participantsCount = 0 } = await request.json();
 
         const subscription = await payload.findByID({
@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
                 month: currentMonth,
                 roomsCreated: 0,
                 totalDuration: 0,
+                totalMinutes: 0,
                 participantsCount: 0,
             };
         }
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
             month: currentMonth,
             roomsCreated: monthlyUsage.roomsCreated + 1,
             totalDuration: monthlyUsage.totalDuration + duration,
+            totalMinutes: monthlyUsage.totalMinutes + duration,
             participantsCount: monthlyUsage.participantsCount + participantsCount,
         };
 

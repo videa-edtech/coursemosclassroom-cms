@@ -1,3 +1,4 @@
+// collections/Plans.ts
 import type { CollectionConfig } from 'payload'
 
 export const Plans: CollectionConfig = {
@@ -38,7 +39,20 @@ export const Plans: CollectionConfig = {
         {
             name: 'currency',
             type: 'select',
-            options: ['USD', 'EUR', 'VND'],
+            options: [
+                {
+                    label: 'USD',
+                    value: 'USD',
+                },
+                {
+                    label: 'EUR',
+                    value: 'EUR',
+                },
+                {
+                    label: 'VND',
+                    value: 'VND',
+                },
+            ],
             defaultValue: 'USD',
             required: true,
         },
@@ -62,12 +76,18 @@ export const Plans: CollectionConfig = {
             defaultValue: 'monthly',
             required: true,
         },
-        // Quota limits
         {
             name: 'maxRoomsPerMonth',
             type: 'number',
             label: 'Maximum Rooms Per Month',
             defaultValue: 10,
+            required: true,
+        },
+        {
+            name: 'maxMinutesPerMonth',
+            type: 'number',
+            label: 'Maximum Minutes Per Month',
+            defaultValue: 600,
             required: true,
         },
         {
@@ -103,7 +123,20 @@ export const Plans: CollectionConfig = {
         {
             name: 'status',
             type: 'select',
-            options: ['active', 'inactive', 'archived'],
+            options: [
+                {
+                    label: 'Active',
+                    value: 'active',
+                },
+                {
+                    label: 'Inactive',
+                    value: 'inactive',
+                },
+                {
+                    label: 'Archived',
+                    value: 'archived',
+                },
+            ],
             defaultValue: 'active',
         },
         {
@@ -112,4 +145,5 @@ export const Plans: CollectionConfig = {
             defaultValue: 0,
         },
     ],
+    timestamps: true,
 }
