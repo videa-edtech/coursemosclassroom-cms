@@ -82,33 +82,56 @@ export const Subscriptions: CollectionConfig = {
             type: 'checkbox',
             defaultValue: false,
         },
+        // Monthly usage tracking
         {
-            name: 'trialEnd',
-            type: 'date',
-        },
-        {
-            name: 'usage',
+            name: 'monthlyUsage',
             type: 'group',
             fields: [
                 {
-                    name: 'participantsUsed',
+                    name: 'month',
+                    type: 'text', // Format: YYYY-MM
+                    required: true,
+                },
+                {
+                    name: 'roomsCreated',
                     type: 'number',
                     defaultValue: 0,
                 },
                 {
-                    name: 'durationUsed',
+                    name: 'totalDuration',
                     type: 'number',
-                    label: 'Duration Used (minutes)',
+                    label: 'Total Duration (minutes)',
                     defaultValue: 0,
                 },
                 {
-                    name: 'storageUsed',
+                    name: 'participantsCount',
                     type: 'number',
-                    label: 'Storage Used (GB)',
+                    defaultValue: 0,
+                },
+            ],
+        },
+        // Usage history array to track multiple months
+        {
+            name: 'usageHistory',
+            type: 'array',
+            fields: [
+                {
+                    name: 'month',
+                    type: 'text',
+                    required: true,
+                },
+                {
+                    name: 'roomsCreated',
+                    type: 'number',
                     defaultValue: 0,
                 },
                 {
-                    name: 'roomsUsed',
+                    name: 'totalDuration',
+                    type: 'number',
+                    defaultValue: 0,
+                },
+                {
+                    name: 'participantsCount',
                     type: 'number',
                     defaultValue: 0,
                 },
@@ -119,9 +142,18 @@ export const Subscriptions: CollectionConfig = {
         beforeChange: [
             ({ data, operation }) => {
                 if (operation === 'create') {
-                    // Set current period dates based on start date and plan's billing period
                     if (data.startDate && !data.currentPeriodStart) {
                         data.currentPeriodStart = data.startDate
+                    }
+                    // Initialize current month usage
+                    const currentMonth = new Date().toISOString().slice(0, 7)
+                    if (!data.monthlyUsage) {
+                        data.monthlyUsage = {
+                            month: currentMonth,
+                            roomsCreated: 0,
+                            totalDuration: 0,
+                            participantsCount: 0,
+                        }
                     }
                 }
                 return data

@@ -1,4 +1,3 @@
-// src/contexts/AuthContext.tsx
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -6,6 +5,7 @@ import { FlatUser } from '@/services/flat/types';
 
 interface AuthContextType {
     user: FlatUser | null;
+    customerId: string | null;
     login: (email: string, password: string) => Promise<void>;
     register: (email: string, password: string, code: string) => Promise<void>;
     sendVerificationCode: (email: string) => Promise<void>;
@@ -31,25 +31,62 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [user, setUser] = useState<FlatUser | null>(null);
+    const [customerId, setCustomerId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-    // Load user from localStorage on mount
+    // Load user and customerId from localStorage on mount
     useEffect(() => {
         const savedUser = localStorage.getItem('flatUser');
+        const savedCustomerId = localStorage.getItem('customerId');
+
         if (savedUser) {
             try {
                 const parsedUser = JSON.parse(savedUser);
                 setUser(parsedUser);
+
+                // Try to get customerId from user data or localStorage
+                if (parsedUser.customerId) {
+                    setCustomerId(parsedUser.customerId);
+                } else if (savedCustomerId) {
+                    setCustomerId(savedCustomerId);
+                } else {
+                    // If no customerId found, fetch it from API
+                    fetchCustomerId(parsedUser.email);
+                }
+
                 console.log('Loaded user from localStorage:', parsedUser);
             } catch (error) {
                 console.error('Error parsing saved user:', error);
                 localStorage.removeItem('flatUser');
+                localStorage.removeItem('customerId');
             }
         }
         setIsCheckingAuth(false);
     }, []);
+
+    const fetchCustomerId = async (email: string) => {
+        try {
+            const response = await fetch('/api/customers/find-by-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.customerId) {
+                    setCustomerId(data.customerId);
+                    localStorage.setItem('customerId', data.customerId);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching customer ID:', error);
+        }
+    };
 
     const sendVerificationCode = async (email: string) => {
         setIsLoading(true);
@@ -102,6 +139,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const userData = data.data;
             setUser(userData);
             localStorage.setItem('flatUser', JSON.stringify(userData));
+
+            // Fetch customer ID after registration
+            await fetchCustomerId(email);
+
             console.log('Registration successful, user saved to localStorage');
 
         } catch (error: any) {
@@ -134,6 +175,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const userData = data.data;
             setUser(userData);
             localStorage.setItem('flatUser', JSON.stringify(userData));
+
+            // Fetch customer ID after login
+            await fetchCustomerId(email);
+
             console.log('Login successful, user saved to localStorage');
 
         } catch (error: any) {
@@ -146,12 +191,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const logout = () => {
         setUser(null);
+        setCustomerId(null);
         localStorage.removeItem('flatUser');
+        localStorage.removeItem('customerId');
         console.log('User logged out');
     };
 
     const value = {
         user,
+        customerId,
         login,
         register,
         sendVerificationCode,

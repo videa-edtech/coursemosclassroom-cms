@@ -37,20 +37,76 @@ export async function POST(request: NextRequest) {
         const payload = await getPayloadClient();
         const data = await request.json();
 
-        const result = await payload.create({
+        console.log('Received subscription data:', data);
+
+        // Validate required fields
+        if (!data.customer || !data.plan) {
+            return NextResponse.json(
+                { error: 'Customer and Plan are required' },
+                { status: 400 }
+            );
+        }
+
+        // Set current month for monthlyUsage
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+        // Prepare subscription data with proper monthlyUsage
+        const subscriptionData = {
+            customer: data.customer,
+            plan: data.plan,
+            startDate: data.startDate || new Date().toISOString(),
+            endDate: data.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            status: data.status || 'pending',
+            autoRenew: data.autoRenew !== undefined ? data.autoRenew : true,
+            monthlyUsage: {
+                month: currentMonth,
+                roomsCreated: 0,
+                totalDuration: 0,
+                participantsCount: 0,
+            },
+            usageHistory: [],
+        };
+
+        console.log('Creating subscription with data:', subscriptionData);
+
+        const subscription = await payload.create({
             collection: 'subscriptions',
-            data,
+            data: subscriptionData,
         });
 
-        return NextResponse.json({ doc: result });
-    } catch (error) {
+        console.log('Subscription created successfully:', subscription.id);
+
+        return NextResponse.json({
+            success: true,
+            doc: subscription
+        });
+    } catch (error: any) {
         console.error('Error creating subscription:', error);
         return NextResponse.json(
-            { error: 'Internal Server Error' },
+            { error: error.message || 'Internal server error' },
             { status: 500 }
         );
     }
 }
+// export async function POST(request: NextRequest) {
+//     try {
+//         const payload = await getPayloadClient();
+//         const data = await request.json();
+//
+//         const result = await payload.create({
+//             collection: 'subscriptions',
+//             data,
+//         });
+//
+//         return NextResponse.json({ doc: result });
+//     } catch (error) {
+//         console.error('Error creating subscription:', error);
+//         return NextResponse.json(
+//             { error: 'Internal Server Error' },
+//             { status: 500 }
+//         );
+//     }
+// }
 
 
 

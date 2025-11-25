@@ -62,38 +62,14 @@ export const Plans: CollectionConfig = {
             defaultValue: 'monthly',
             required: true,
         },
+        // Quota limits
         {
-            name: 'features',
-            type: 'array',
-            fields: [
-                {
-                    name: 'feature',
-                    type: 'text',
-                    required: true,
-                },
-                {
-                    name: 'included',
-                    type: 'checkbox',
-                    defaultValue: true,
-                },
-                {
-                    name: 'limit',
-                    type: 'number',
-                    admin: {
-                        condition: (data, siblingData) => siblingData.included === true,
-                    },
-                },
-                {
-                    name: 'unit',
-                    type: 'text',
-                    admin: {
-                        condition: (data, siblingData) =>
-                            siblingData.included === true && siblingData.limit,
-                    },
-                },
-            ],
+            name: 'maxRoomsPerMonth',
+            type: 'number',
+            label: 'Maximum Rooms Per Month',
+            defaultValue: 10,
+            required: true,
         },
-        // Meeting room specific features
         {
             name: 'maxParticipants',
             type: 'number',
@@ -103,8 +79,9 @@ export const Plans: CollectionConfig = {
         {
             name: 'maxDuration',
             type: 'number',
-            label: 'Max Duration (minutes)',
+            label: 'Max Duration Per Room (minutes)',
             defaultValue: 60,
+            required: true,
         },
         {
             name: 'recordingStorage',
@@ -113,7 +90,7 @@ export const Plans: CollectionConfig = {
             defaultValue: 1,
         },
         {
-            name: 'maxRooms',
+            name: 'maxConcurrentRooms',
             type: 'number',
             label: 'Maximum Concurrent Rooms',
             defaultValue: 1,
@@ -122,22 +99,6 @@ export const Plans: CollectionConfig = {
             name: 'whiteboard',
             type: 'checkbox',
             defaultValue: true,
-        },
-        // {
-        //     name: 'breakoutRooms',
-        //     type: 'checkbox',
-        //     defaultValue: false,
-        // },
-        // {
-        //     name: 'customBranding',
-        //     type: 'checkbox',
-        //     defaultValue: false,
-        // },
-        {
-            name: 'totalMinutes',
-            type: 'number',
-            label: 'Total Minutes',
-            defaultValue: 360,
         },
         {
             name: 'status',

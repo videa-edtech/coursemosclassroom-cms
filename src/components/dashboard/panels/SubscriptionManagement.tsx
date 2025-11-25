@@ -18,7 +18,7 @@ interface Subscription {
         maxParticipants: number;
         maxDuration: number;
         recordingStorage: number;
-        maxRooms: number;
+        maxRoomsPerMonth: number;
     };
     startDate: string;
     endDate: string;
@@ -388,7 +388,7 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ user })
                                                 <div>Participants: {subscription.plan.maxParticipants}</div>
                                                 <div>Duration: {subscription.plan.maxDuration === 0 ? 'Unlimited' : `${subscription.plan.maxDuration}min`}</div>
                                                 <div>Storage: {subscription.plan.recordingStorage}GB</div>
-                                                <div>Rooms: {subscription.plan.maxRooms}</div>
+                                                <div>Rooms: {subscription.plan.maxRoomsPerMonth}</div>
                                             </div>
                                         )}
                                     </div>

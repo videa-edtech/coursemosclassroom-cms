@@ -1,4 +1,3 @@
-// src/components/dashboard/DashboardPanel.tsx
 'use client';
 
 import { useState } from 'react';
@@ -8,23 +7,25 @@ import RoomManagement from './panels/RoomManagement';
 import Analytics from './panels/Analytics';
 import Settings from './panels/Settings';
 import SubscriptionManagement from './panels/SubscriptionManagement';
+import { useAuth } from '@/contexts/AuthContext'; // Thêm import
 
 interface DashboardPanelProps {
     user: FlatUser;
     onLogout: () => void;
 }
 
-type PanelType = 'profile' | 'rooms' | 'analytics' | 'settings' | 'subcriptions';
+type PanelType = 'profile' | 'rooms' | 'analytics' | 'settings' | 'subscriptions'; // Sửa lỗi chính tả
 
 const DashboardPanel: React.FC<DashboardPanelProps> = ({ user, onLogout }) => {
     const [activePanel, setActivePanel] = useState<PanelType>('profile');
+    const { customerId } = useAuth(); // Lấy customerId từ AuthContext
 
     const panels = {
         profile: <UserProfile user={user} />,
-        rooms: <RoomManagement user={user} />,
+        rooms: <RoomManagement user={user} customerId={customerId} />, // Truyền customerId
         analytics: <Analytics user={user} />,
         settings: <Settings user={user} onLogout={onLogout} />,
-        subcriptions: <SubscriptionManagement user={user} />
+        subscriptions: <SubscriptionManagement user={user} customerId={customerId} />
     };
 
     return (
@@ -36,6 +37,9 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ user, onLogout }) => {
                         <div className="flex items-center space-x-4">
                             <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
                             <span className="text-sm text-gray-500">Welcome, {user.name}</span>
+                            {/*{customerId && (*/}
+                            {/*    <span className="text-xs text-gray-400">Customer ID: {customerId}</span>*/}
+                            {/*)}*/}
                         </div>
                         <button
                             onClick={onLogout}
@@ -124,9 +128,9 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ user, onLogout }) => {
                             </li>
                             <li>
                                 <button
-                                    onClick={() => setActivePanel('subcriptions')}
+                                    onClick={() => setActivePanel('subscriptions')}
                                     className={`flex items-center gap-1 w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                                        activePanel === 'subcriptions'
+                                        activePanel === 'subscriptions'
                                             ? 'bg-blue-500 text-white'
                                             : 'text-gray-700 hover:bg-gray-100'
                                     }`}
@@ -136,7 +140,7 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ user, onLogout }) => {
                                         <path strokeLinecap="round" strokeLinejoin="round"
                                               d="M6 13.5V3.75m0 9.75a1.5 1.5 0 0 1 0 3m0-3a1.5 1.5 0 0 0 0 3m0 3.75V16.5m12-3V3.75m0 9.75a1.5 1.5 0 0 1 0 3m0-3a1.5 1.5 0 0 0 0 3m0 3.75V16.5m-6-9V3.75m0 3.75a1.5 1.5 0 0 1 0 3m0-3a1.5 1.5 0 0 0 0 3m0 9.75V10.5"/>
                                     </svg>
-                                    ️ Subcriptions
+                                    ️ Subscriptions
                                 </button>
                             </li>
                         </ul>

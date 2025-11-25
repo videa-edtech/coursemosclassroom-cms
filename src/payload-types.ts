@@ -237,13 +237,21 @@ export interface Subscription {
   currentPeriodStart?: string | null;
   currentPeriodEnd?: string | null;
   cancelAtPeriodEnd?: boolean | null;
-  trialEnd?: string | null;
-  usage?: {
-    participantsUsed?: number | null;
-    durationUsed?: number | null;
-    storageUsed?: number | null;
-    roomsUsed?: number | null;
+  monthlyUsage?: {
+    month?: string | null;
+    roomsCreated?: number | null;
+    totalDuration?: number | null;
+    participantsCount?: number | null;
   };
+  usageHistory?:
+    | {
+        month?: string | null;
+        roomsCreated?: number | null;
+        totalDuration?: number | null;
+        participantsCount?: number | null;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -259,21 +267,13 @@ export interface Plan {
   price: number;
   currency: 'USD' | 'EUR' | 'VND';
   billingPeriod: 'monthly' | 'quarterly' | 'yearly';
-  features?:
-    | {
-        feature: string;
-        included?: boolean | null;
-        limit?: number | null;
-        unit?: string | null;
-        id?: string | null;
-      }[]
-    | null;
+  maxRoomsPerMonth: number;
+  maxMinutesPerMonth: number;
   maxParticipants: number;
-  maxDuration?: number | null;
+  maxDuration: number;
   recordingStorage?: number | null;
-  maxRooms?: number | null;
+  maxConcurrentRooms?: number | null;
   whiteboard?: boolean | null;
-  totalMinutes?: number | null;
   status?: ('active' | 'inactive' | 'archived') | null;
   sortOrder?: number | null;
   updatedAt: string;
@@ -286,17 +286,20 @@ export interface Plan {
 export interface Meeting {
   id: number;
   customer_id: number | Customer;
+  subscription_id: number | Subscription;
   name: string;
   moodle_course_id?: string | null;
   moodle_user_email?: string | null;
   flat_room_id?: string | null;
   flat_room_link?: string | null;
-  start_time?: string | null;
-  end_time?: string | null;
+  start_time: string;
+  end_time: string;
   /**
-   * Duaration (minute)
+   * Duration (minutes)
    */
   duration?: number | null;
+  participants_count?: number | null;
+  status?: ('scheduled' | 'active' | 'completed' | 'cancelled') | null;
   /**
    * Email list
    */
@@ -566,14 +569,22 @@ export interface SubscriptionsSelect<T extends boolean = true> {
   currentPeriodStart?: T;
   currentPeriodEnd?: T;
   cancelAtPeriodEnd?: T;
-  trialEnd?: T;
-  usage?:
+  monthlyUsage?:
     | T
     | {
-        participantsUsed?: T;
-        durationUsed?: T;
-        storageUsed?: T;
-        roomsUsed?: T;
+        month?: T;
+        roomsCreated?: T;
+        totalDuration?: T;
+        participantsCount?: T;
+      };
+  usageHistory?:
+    | T
+    | {
+        month?: T;
+        roomsCreated?: T;
+        totalDuration?: T;
+        participantsCount?: T;
+        id?: T;
       };
   updatedAt?: T;
   createdAt?: T;
@@ -584,6 +595,7 @@ export interface SubscriptionsSelect<T extends boolean = true> {
  */
 export interface MeetingsSelect<T extends boolean = true> {
   customer_id?: T;
+  subscription_id?: T;
   name?: T;
   moodle_course_id?: T;
   moodle_user_email?: T;
@@ -592,6 +604,8 @@ export interface MeetingsSelect<T extends boolean = true> {
   start_time?: T;
   end_time?: T;
   duration?: T;
+  participants_count?: T;
+  status?: T;
   users?:
     | T
     | {
@@ -649,21 +663,13 @@ export interface PlansSelect<T extends boolean = true> {
   price?: T;
   currency?: T;
   billingPeriod?: T;
-  features?:
-    | T
-    | {
-        feature?: T;
-        included?: T;
-        limit?: T;
-        unit?: T;
-        id?: T;
-      };
+  maxRoomsPerMonth?: T;
+  maxMinutesPerMonth?: T;
   maxParticipants?: T;
   maxDuration?: T;
   recordingStorage?: T;
-  maxRooms?: T;
+  maxConcurrentRooms?: T;
   whiteboard?: T;
-  totalMinutes?: T;
   status?: T;
   sortOrder?: T;
   updatedAt?: T;

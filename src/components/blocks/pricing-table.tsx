@@ -1,4 +1,3 @@
-//src/components/blocks/pricing-table.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -25,7 +24,7 @@ interface Plan {
   recordingStorage: number;
   maxRooms: number;
   whiteboard: boolean;
-  totalMinutes: number
+  totalMinutes: number;
   status: 'active' | 'inactive' | 'archived';
 }
 
@@ -41,21 +40,169 @@ interface PricingTableProps {
   className?: string;
 }
 
-// Hàm renderFeatureValue được định nghĩa ở ngoài component
-const renderFeatureValue = (value: true | false | null | string | number) => {
-  if (value === true) {
-    return <Check className="size-5 text-green-500" />;
-  }
-  if (value === false) {
-    return <X className="size-5 text-red-400" />;
-  }
-  if (value === null) {
-    return <span className="text-muted-foreground text-sm">-</span>;
-  }
-  // String or number value
+// Component con để tránh lỗi hooks rules
+const FeatureSections = ({
+                           selectedPlan,
+                           comparisonFeatures,
+                           plans
+                         }: {
+  selectedPlan: number;
+  comparisonFeatures: FeatureSection[];
+  plans: Plan[];
+}) => {
+  const renderFeatureValue = (value: true | false | null | string | number) => {
+    if (value === true) {
+      return <Check className="size-5 text-green-500" />;
+    }
+    if (value === false) {
+      return <X className="size-5 text-red-400" />;
+    }
+    if (value === null) {
+      return <span className="text-muted-foreground text-sm">-</span>;
+    }
+    // String or number value
+    return (
+        <div className="flex items-center gap-2">
+          <span className="text-foreground font-medium">{value}</span>
+        </div>
+    );
+  };
+
   return (
-      <div className="flex items-center gap-2">
-        <span className="text-foreground font-medium">{value}</span>
+      <div className="space-y-8">
+        {comparisonFeatures.map((section, sectionIndex) => (
+            <div key={sectionIndex} className="border rounded-lg overflow-hidden">
+              <div className="bg-muted/50 px-6 py-4 border-b">
+                <h3 className="text-lg font-semibold">{section.category}</h3>
+              </div>
+              <div className="divide-y">
+                {section.features.map((feature, featureIndex) => (
+                    <div
+                        key={featureIndex}
+                        className="grid grid-cols-2 md:grid-cols-4 items-center px-6 py-4 hover:bg-muted/30 transition-colors"
+                    >
+                <span className="font-medium text-foreground">
+                  {feature.name}
+                </span>
+
+                      {/* Mobile View - Only Selected Plan */}
+                      <div className="md:hidden flex justify-end">
+                        {renderFeatureValue(
+                            feature[plans[selectedPlan]?.slug]
+                        )}
+                      </div>
+
+                      {/* Desktop View - All Plans */}
+                      <div className="hidden md:col-span-3 md:grid md:grid-cols-3 md:gap-8">
+                        {plans.map((plan, i) => (
+                            <div
+                                key={i}
+                                className="flex justify-center"
+                            >
+                              {renderFeatureValue(feature[plan.slug])}
+                            </div>
+                        ))}
+                      </div>
+                    </div>
+                ))}
+              </div>
+            </div>
+        ))}
+      </div>
+  );
+};
+
+// Component con PlanHeaders
+const PlanHeaders = ({
+                       selectedPlan,
+                       onPlanChange,
+                       pricingPlans,
+                     }: {
+  selectedPlan: number;
+  onPlanChange: (index: number) => void;
+  pricingPlans: any[];
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+      <div className="mb-8">
+        {/* Mobile View */}
+        <div className="md:hidden">
+          <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border rounded-lg">
+            <div className="flex items-center justify-between p-4">
+              <CollapsibleTrigger className="flex items-center gap-2">
+                <div className="text-left">
+                  <h3 className="text-xl font-semibold">
+                    {pricingPlans[selectedPlan]?.name}
+                  </h3>
+                  <p className="text-muted-foreground text-sm">
+                    {pricingPlans[selectedPlan]?.price}/month
+                  </p>
+                </div>
+                <ChevronsUpDown
+                    className={`size-5 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                />
+              </CollapsibleTrigger>
+              <Button
+                  variant={pricingPlans[selectedPlan]?.button.variant || "outline"}
+                  className="w-fit"
+              >
+                {pricingPlans[selectedPlan]?.button.text}
+              </Button>
+            </div>
+            <CollapsibleContent className="flex flex-col space-y-2 p-4 border-t">
+              {pricingPlans.map(
+                  (plan, index) =>
+                      index !== selectedPlan && (
+                          <button
+                              key={index}
+                              className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
+                              onClick={() => {
+                                onPlanChange(index);
+                                setIsOpen(false);
+                              }}
+                              type="button"
+                          >
+                            <div className="text-left">
+                              <h4 className="font-semibold">{plan.name}</h4>
+                              <p className="text-muted-foreground text-sm">{plan.price}/month</p>
+                            </div>
+                          </button>
+                      ),
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+
+        {/* Desktop View */}
+        <div className="hidden md:grid md:grid-cols-4 gap-8">
+          <div className="col-span-1">
+            <h3 className="text-2xl font-bold mb-4">Plans & Features</h3>
+            <p className="text-muted-foreground">
+              Compare all meeting room features across our plans
+            </p>
+          </div>
+
+          {pricingPlans.map((plan, index) => (
+              <div key={index} className="text-center space-y-4">
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">{plan.name}</h3>
+                  <div className="text-2xl font-bold text-foreground mb-1">
+                    {plan.price}
+                  </div>
+                  <div className="text-muted-foreground text-sm">per month</div>
+                </div>
+                <Button
+                    variant={plan.button.variant}
+                    className="w-full"
+                    size="lg"
+                    type="button"
+                >
+                  {plan.button.text}
+                </Button>
+              </div>
+          ))}
+        </div>
       </div>
   );
 };
@@ -172,7 +319,7 @@ export const PricingTable = ({ className }: PricingTableProps) => {
         {
           name: "Total Minutes",
           ...plans.reduce((acc, plan) => {
-            acc[plan.slug] = `${plan.totalMinutes } minutes`;
+            acc[plan.slug] = `${plan.totalMinutes} minutes`;
             return acc;
           }, {} as any)
         },
@@ -198,7 +345,7 @@ export const PricingTable = ({ className }: PricingTableProps) => {
         {
           name: "Dedicated Account Manager",
           ...plans.reduce((acc, plan) => {
-            acc[plan.slug] = plan.slug === 'pro' || plan.slug === 'enterprise' || plan.slug === 'basic';
+            acc[plan.slug] = plan.slug === 'enterprise';
             return acc;
           }, {} as any)
         },
@@ -251,171 +398,5 @@ export const PricingTable = ({ className }: PricingTableProps) => {
           />
         </div>
       </section>
-  );
-};
-
-// Component PlanHeaders
-const PlanHeaders = ({
-                       selectedPlan,
-                       onPlanChange,
-                       pricingPlans,
-                     }: {
-  selectedPlan: number;
-  onPlanChange: (index: number) => void;
-  pricingPlans: any[];
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-      <div className="mb-8">
-        {/* Mobile View */}
-        <div className="md:hidden">
-          <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border rounded-lg">
-            <div className="flex items-center justify-between p-4">
-              <CollapsibleTrigger className="flex items-center gap-2">
-                <div className="text-left">
-                  <h3 className="text-xl font-semibold">
-                    {pricingPlans[selectedPlan]?.name}
-                  </h3>
-                  <p className="text-muted-foreground text-sm">
-                    {pricingPlans[selectedPlan]?.price}/month
-                  </p>
-                </div>
-                <ChevronsUpDown
-                    className={`size-5 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                />
-              </CollapsibleTrigger>
-              <Button
-                  variant={pricingPlans[selectedPlan]?.button.variant || "outline"}
-                  className="w-fit"
-              >
-                {pricingPlans[selectedPlan]?.button.text}
-              </Button>
-            </div>
-            <CollapsibleContent className="flex flex-col space-y-2 p-4 border-t">
-              {pricingPlans.map(
-                  (plan, index) =>
-                      index !== selectedPlan && (
-                          <button
-                              key={index}
-                              className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
-                              onClick={() => {
-                                onPlanChange(index);
-                                setIsOpen(false);
-                              }}
-                          >
-                            <div className="text-left">
-                              <h4 className="font-semibold">{plan.name}</h4>
-                              <p className="text-muted-foreground text-sm">{plan.price}/month</p>
-                            </div>
-                          </button>
-                      ),
-              )}
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
-
-        {/* Desktop View */}
-        <div className="hidden md:grid md:grid-cols-4 gap-8">
-          <div className="col-span-1">
-            <h3 className="text-2xl font-bold mb-4">Plans & Features</h3>
-            <p className="text-muted-foreground">
-              Compare all meeting room features across our plans
-            </p>
-          </div>
-
-          {pricingPlans.map((plan, index) => (
-              <div key={index} className="text-center space-y-4">
-                <div>
-                  <h3 className="text-xl font-semibold mb-2">{plan.name}</h3>
-                  <div className="text-2xl font-bold text-foreground mb-1">
-                    {plan.price}
-                  </div>
-                  <div className="text-muted-foreground text-sm">per month</div>
-                </div>
-                <Button
-                    variant={plan.button.variant}
-                    className="w-full"
-                    size="lg"
-                >
-                  {plan.button.text}
-                </Button>
-              </div>
-          ))}
-        </div>
-      </div>
-  );
-};
-
-// Component FeatureSections
-const FeatureSections = ({
-                           selectedPlan,
-                           comparisonFeatures,
-                           plans
-                         }: {
-  selectedPlan: number;
-  comparisonFeatures: FeatureSection[];
-  plans: Plan[];
-}) => {
-  // Hàm renderFeatureValue được định nghĩa lại trong component hoặc import từ ngoài
-  const renderFeatureValue = (value: true | false | null | string | number) => {
-    if (value === true) {
-      return <Check className="size-5 text-green-500" />;
-    }
-    if (value === false) {
-      return <X className="size-5 text-red-400" />;
-    }
-    if (value === null) {
-      return <span className="text-muted-foreground text-sm">-</span>;
-    }
-    // String or number value
-    return (
-        <div className="flex items-center gap-2">
-          <span className="text-foreground font-medium">{value}</span>
-        </div>
-    );
-  };
-
-  return (
-      <div className="space-y-8">
-        {comparisonFeatures.map((section, sectionIndex) => (
-            <div key={sectionIndex} className="border rounded-lg overflow-hidden">
-              <div className="bg-muted/50 px-6 py-4 border-b">
-                <h3 className="text-lg font-semibold">{section.category}</h3>
-              </div>
-              <div className="divide-y">
-                {section.features.map((feature, featureIndex) => (
-                    <div
-                        key={featureIndex}
-                        className="grid grid-cols-2 md:grid-cols-4 items-center px-6 py-4 hover:bg-muted/30 transition-colors"
-                    >
-                <span className="font-medium text-foreground">
-                  {feature.name}
-                </span>
-
-                      {/* Mobile View - Only Selected Plan */}
-                      <div className="md:hidden flex justify-end">
-                        {renderFeatureValue(
-                            feature[plans[selectedPlan]?.slug]
-                        )}
-                      </div>
-
-                      {/* Desktop View - All Plans */}
-                      <div className="hidden md:col-span-3 md:grid md:grid-cols-3 md:gap-8">
-                        {plans.map((plan, i) => (
-                            <div
-                                key={i}
-                                className="flex justify-center"
-                            >
-                              {renderFeatureValue(feature[plan.slug])}
-                            </div>
-                        ))}
-                      </div>
-                    </div>
-                ))}
-              </div>
-            </div>
-        ))}
-      </div>
   );
 };

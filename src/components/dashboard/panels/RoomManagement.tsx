@@ -1,4 +1,3 @@
-// src/components/dashboard/panels/RoomManagement.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,9 +5,11 @@ import { FlatUser } from '@/services/flat/types';
 import { flatService } from '@/services/flat';
 import { RoomItem } from '@/services/flat/types';
 import { useAuth } from "@/contexts/AuthContext";
+import { SubscriptionService, SubscriptionCheck } from '@/services/subscription';
 
 interface RoomManagementProps {
     user: FlatUser;
+    customerId: string;
 }
 
 interface CreateRoomForm {
@@ -18,7 +19,6 @@ interface CreateRoomForm {
     email: string;
 }
 
-// Room Status Enum
 enum RoomStatus {
     Idle = "Idle",
     Started = "Started",
@@ -26,10 +26,9 @@ enum RoomStatus {
     Cancelled = "Cancelled"
 }
 
-// Tab type
 type TabType = 'all' | RoomStatus;
 
-const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
+const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => {
     const flatUser = JSON.parse(localStorage.getItem('flatUser') || '{}');
     const [formData, setFormData] = useState<CreateRoomForm>({
         title: '',
@@ -50,12 +49,23 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('all');
 
-    // Lấy danh sách phòng khi component mount hoặc currentPage thay đổi
-    useEffect(() => {
-        fetchUserRooms();
-    }, [user.token, currentPage]);
+    // Subscription state
+    const [subscriptionCheck, setSubscriptionCheck] = useState<SubscriptionCheck | null>(null);
+    const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
 
-    // Lọc rooms theo tab active
+    // Check subscription on component mount
+    useEffect(() => {
+        checkSubscription();
+    }, [customerId]);
+
+    // Fetch rooms and check subscription
+    useEffect(() => {
+        if (subscriptionCheck?.hasActiveSubscription) {
+            fetchUserRooms();
+        }
+    }, [user.token, currentPage, subscriptionCheck]);
+
+    // Filter rooms
     useEffect(() => {
         if (activeTab === 'all') {
             setFilteredRooms(rooms);
@@ -64,7 +74,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
         }
     }, [rooms, activeTab]);
 
-    // Set email mặc định từ user
+    // Set email
     useEffect(() => {
         if (user?.email) {
             setFormData(prev => ({
@@ -74,15 +84,36 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
         }
     }, [user.email]);
 
+    const checkSubscription = async () => {
+        if (!customerId) return;
+
+        setIsCheckingSubscription(true);
+        setError('');
+        try {
+            const check = await SubscriptionService.checkUserSubscription(customerId);
+            setSubscriptionCheck(check);
+
+            if (!check.hasActiveSubscription) {
+                setError('You need an active subscription to create rooms. Please subscribe to a plan first.');
+            } else if (!check.canCreateRoom) {
+                setError(`Cannot create room: ${check.limitations?.join(', ')}. Please upgrade your plan.`);
+            }
+        } catch (error: any) {
+            console.error('Error checking subscription:', error);
+            setError('Failed to check subscription status');
+        } finally {
+            setIsCheckingSubscription(false);
+        }
+    };
+
     const fetchUserRooms = async () => {
-        if (!user?.token) return;
+        if (!user?.token || !subscriptionCheck?.hasActiveSubscription) return;
 
         setIsLoading(true);
         setError('');
         try {
-            const roomData = await flatService.getUserRooms(user.token, currentPage, 50); // Tăng số lượng để phân trang tốt hơn
+            const roomData = await flatService.getUserRooms(user.token, currentPage, 50);
             setRooms(roomData.list);
-            console.log(roomData.list)
             setTotalRooms(roomData.total);
         } catch (error: any) {
             console.error('Error fetching rooms:', error);
@@ -130,8 +161,18 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
         return new Date(dateTimeString).getTime();
     };
 
+    const calculateDuration = (beginTime: string, endTime: string): number => {
+        return (dateTimeToTimestamp(endTime) - dateTimeToTimestamp(beginTime)) / (60 * 1000);
+    };
+
     const handleCreateRoom = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Check subscription first
+        if (!subscriptionCheck?.canCreateRoom) {
+            setError('Cannot create room due to subscription limitations. Please check your plan.');
+            return;
+        }
 
         if (!formData.title.trim()) {
             setError('Please enter room title');
@@ -150,9 +191,15 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
 
         const beginTime = dateTimeToTimestamp(formData.beginTime);
         const endTime = dateTimeToTimestamp(formData.endTime);
+        const duration = calculateDuration(formData.beginTime, formData.endTime);
 
         if (beginTime >= endTime) {
             setError('End time must be after start time');
+            return;
+        }
+
+        if (duration > (subscriptionCheck.plan?.maxDuration || 60)) {
+            setError(`Room duration cannot exceed ${subscriptionCheck.plan?.maxDuration} minutes according to your plan`);
             return;
         }
 
@@ -170,6 +217,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
         setError('');
         setSuccessMessage('');
         try {
+            // Create room in Flat
             const room = await flatService.createRoom(
                 {
                     title: formData.title,
@@ -182,7 +230,35 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
                     flatUser
                 }
             );
+
             if (room.data.roomUUID) {
+                // Create meeting record in Payload
+                await fetch('/api/meetings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        customer_id: customerId,
+                        subscription_id: subscriptionCheck.subscription?.id,
+                        name: formData.title,
+                        flat_room_id: room.data.roomUUID,
+                        flat_room_link: `${process.env.NEXT_PUBLIC_FLAT_CMS_BASE_URL}/join/${room.data.roomUUID}`,
+                        start_time: formData.beginTime,
+                        end_time: formData.endTime,
+                        duration: duration,
+                        participants_count: 0,
+                        status: 'scheduled',
+                        users: [{ email: formData.email }]
+                    }),
+                });
+
+                // Update subscription usage
+                await SubscriptionService.updateUsage(
+                    subscriptionCheck.subscription?.id!,
+                    duration
+                );
+
                 setCreatedRoom(room.data);
                 setFormData({
                     title: '',
@@ -192,6 +268,9 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
                 });
                 setShowCreateForm(false);
                 setSuccessMessage('Room created successfully!');
+
+                // Refresh subscription check and rooms
+                await checkSubscription();
                 await fetchUserRooms();
             } else {
                 setError('Failed to create room: ' + JSON.stringify(room));
@@ -272,13 +351,87 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
         return status === RoomStatus.Started;
     };
 
-    // Đếm số lượng room theo status
     const getRoomCountByStatus = (status: TabType) => {
         if (status === 'all') return totalRooms;
         return rooms.filter(room => getRoomStatus(room) === status).length;
     };
 
-    // Tabs configuration
+    // Subscription usage display
+    const renderSubscriptionInfo = () => {
+        if (!subscriptionCheck?.hasActiveSubscription) {
+            return (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-yellow-800">
+                                Subscription Required
+                            </h3>
+                            <p className="text-yellow-700 mt-1">
+                                You need an active subscription to create meeting rooms.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => window.open('/pricing', '_blank')}
+                            className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors"
+                        >
+                            View Plans
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        if (!subscriptionCheck.canCreateRoom) {
+            return (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-red-800">
+                                Plan Limit Reached
+                            </h3>
+                            <p className="text-red-700 mt-1">
+                                {subscriptionCheck.limitations?.join(', ')}
+                            </p>
+                            <p className="text-red-600 text-sm mt-2">
+                                Current usage: {subscriptionCheck.usage?.roomsCreated} / {subscriptionCheck.usage?.maxRoomsPerMonth} rooms this month
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => window.open('/pricing', '_blank')}
+                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+                        >
+                            Upgrade Plan
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-green-800">
+                            {subscriptionCheck.plan?.name} Plan
+                        </h3>
+                        <p className="text-green-700 mt-1">
+                            Usage: {subscriptionCheck.usage?.roomsCreated} / {subscriptionCheck.usage?.maxRoomsPerMonth} rooms this month
+                        </p>
+                        <p className="text-green-600 text-sm mt-1">
+                            Max duration: {subscriptionCheck.usage?.maxDurationPerRoom} minutes per room
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => window.open('/pricing', '_blank')}
+                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                        Manage Plan
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     const tabs = [
         { id: 'all' as TabType, label: 'All Rooms', count: getRoomCountByStatus('all') },
         { id: RoomStatus.Started, label: 'Active', count: getRoomCountByStatus(RoomStatus.Started) },
@@ -287,9 +440,23 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
         { id: RoomStatus.Cancelled, label: 'Cancelled', count: getRoomCountByStatus(RoomStatus.Cancelled) },
     ];
 
+    if (isCheckingSubscription) {
+        return (
+            <div className="flex justify-center items-center py-12">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Checking subscription status...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div>
             <h2 className="text-2xl font-bold mb-6">Room Management</h2>
+
+            {/* Subscription Info */}
+            {renderSubscriptionInfo()}
 
             {/* Success Message */}
             {successMessage && (
@@ -332,8 +499,8 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
                     ))}
                 </div>
 
-                {/* Create Room Button */}
-                {!showCreateForm && (
+                {/* Create Room Button - Only show if user can create rooms */}
+                {!showCreateForm && subscriptionCheck?.canCreateRoom && (
                     <div className="bg-white border rounded-lg p-6 text-center">
                         <button
                             onClick={() => setShowCreateForm(true)}
@@ -345,7 +512,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
                 )}
 
                 {/* Create Room Form */}
-                {showCreateForm && (
+                {showCreateForm && subscriptionCheck?.canCreateRoom && (
                     <div className="bg-white border rounded-lg p-6">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-semibold">Create New Room</h3>
@@ -426,9 +593,12 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
                                 </p>
                                 <p className="text-sm text-gray-600 mt-1">
                                     <strong>Duration:</strong> {formData.beginTime && formData.endTime
-                                    ? `${Math.round((dateTimeToTimestamp(formData.endTime) - dateTimeToTimestamp(formData.beginTime)) / (60 * 60 * 1000))} hours`
+                                    ? `${Math.round(calculateDuration(formData.beginTime, formData.endTime))} minutes`
                                     : 'N/A'
                                 }
+                                </p>
+                                <p className="text-sm text-gray-600 mt-1">
+                                    <strong>Plan Limit:</strong> {subscriptionCheck.usage?.maxDurationPerRoom} minutes per room
                                 </p>
                             </div>
 
@@ -458,45 +628,8 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
                     </div>
                 )}
 
-                {/* Created Room Info */}
-                {createdRoom && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-green-800 mb-2">
-                            Room Created Successfully!
-                        </h3>
-                        <div className="space-y-2">
-                            <p><strong>Room UUID:</strong> {createdRoom.roomUUID}</p>
-                            <p>
-                                <strong>Join URL:</strong>
-                                <a
-                                    href={createdRoom.joinUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:underline ml-2"
-                                >
-                                    {createdRoom.joinUrl}
-                                </a>
-                            </p>
-                            <div className="flex gap-2 mt-3">
-                                <button
-                                    onClick={() => joinRoom(createdRoom.roomUUID)}
-                                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
-                                >
-                                    Join Room Now
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(createdRoom.joinUrl);
-                                        alert('Join link copied to clipboard!');
-                                    }}
-                                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-                                >
-                                    Copy Link
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Rest of the component remains the same */}
+                {/* ... (giữ nguyên phần tabs và room list) ... */}
 
                 {/* Status Tabs */}
                 <div className="bg-white border rounded-lg">
@@ -598,11 +731,6 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
                                                     <div>
                                                         <strong>End:</strong> {formatDate(room.end_time)}
                                                     </div>
-                                                    {/*{getRoomStatus(room) === RoomStatus.Cancelled && (*/}
-                                                    {/*    <div className="md:col-span-2">*/}
-                                                    {/*        <strong>Note:</strong> This room has been cancelled*/}
-                                                    {/*    </div>*/}
-                                                    {/*)}*/}
                                                 </div>
                                             </div>
                                             <div className="flex flex-col sm:flex-row gap-2">
@@ -641,7 +769,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user }) => {
                             </div>
                         )}
 
-                        {/* Pagination - chỉ hiển thị khi xem tất cả rooms */}
+                        {/* Pagination */}
                         {activeTab === 'all' && totalRooms > 50 && (
                             <div className="flex justify-between items-center mt-6 pt-4 border-t">
                                 <button

@@ -1,4 +1,3 @@
-//src/components/blocks/pricing.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -166,9 +165,8 @@ export const Pricing = ({ className }: PricingProps) => {
     // Thêm các tính năng boolean
     if (plan.whiteboard) features.push('Whiteboard');
 
-
     // Thêm features từ array features
-    plan.features.forEach(feat => {
+    plan.features?.forEach(feat => {
       if (feat.included) {
         let featureText = feat.feature;
         if (feat.limit && feat.unit) {
@@ -238,6 +236,7 @@ export const Pricing = ({ className }: PricingProps) => {
 
     try {
       setLoginError(null);
+      setIsSubmitting(true);
       await login(loginForm.email, loginForm.password);
 
       // Login successful, switch to registration form
@@ -246,25 +245,39 @@ export const Pricing = ({ className }: PricingProps) => {
 
     } catch (error: any) {
       setLoginError(error.message || "Login failed");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Hàm tìm hoặc tạo customer
   const findOrCreateCustomer = async (email: string, name: string) => {
     try {
+      console.log('Finding customer by email:', email);
+
       // Tìm customer theo email
-      const findResponse = await fetch(`/api/customers/frontend?where[email][equals]=${encodeURIComponent(email)}`);
+      const findResponse = await fetch('/api/customers/find-by-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
 
       if (findResponse.ok) {
         const findData = await findResponse.json();
-        if (findData.docs && findData.docs.length > 0) {
-          // Customer đã tồn tại, trả về customer hiện có
-          return findData.docs[0];
+        console.log('Find customer response:', findData);
+
+        if (findData.customerId) {
+          console.log('Customer found:', findData.customerId);
+          return { id: findData.customerId, ...findData };
         }
       }
 
+      console.log('Customer not found, creating new customer...');
+
       // Nếu không tìm thấy, tạo customer mới
-      const createResponse = await fetch('/api/customers/frontend', {
+      const createResponse = await fetch('/api/customers', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -275,14 +288,18 @@ export const Pricing = ({ className }: PricingProps) => {
           phone: formData.phone,
           organization: formData.organization,
           organization_description: formData.organizationDescription,
+          status: 'active'
         }),
       });
 
       if (!createResponse.ok) {
-        throw new Error('Failed to create customer');
+        const errorData = await createResponse.json();
+        console.error('Create customer error:', errorData);
+        throw new Error(errorData.error || 'Failed to create customer');
       }
 
       const customerData = await createResponse.json();
+      console.log('Customer created:', customerData.doc);
       return customerData.doc;
 
     } catch (error) {
@@ -291,27 +308,12 @@ export const Pricing = ({ className }: PricingProps) => {
     }
   };
 
-  // Hàm cập nhật customer
-  const updateCustomer = async (customerId: string, updates: any) => {
-    const updateResponse = await fetch('/api/customers/frontend/update', {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        id: customerId,
-        ...updates
-      }),
-    });
-    if (!updateResponse.ok) {
-      throw new Error('Failed to update customer information');
-    }
-
-    return await updateResponse.json();
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    console.log('Starting subscription process...');
+    console.log('Form data:', formData);
+    console.log('Selected plan:', selectedPlan);
 
     if (!formData.name || !formData.email || !formData.planId) {
       showToast("Missing information", "Please fill in all required fields.", "destructive");
@@ -322,99 +324,54 @@ export const Pricing = ({ className }: PricingProps) => {
 
     try {
       let customerId: string;
-      let customerData: any;
 
-      if (user) {
-        // Tìm hoặc tạo customer dựa trên email của user
-        customerData = await findOrCreateCustomer(user.email, user.name || formData.name);
+      // Tìm hoặc tạo customer
+      console.log('Finding or creating customer...');
+      const customerData = await findOrCreateCustomer(
+          formData.email,
+          formData.name
+      );
+      customerId = customerData.id;
+      console.log('Customer ID:', customerId);
 
-        customerId = customerData.id;
+      // Tính toán ngày kết thúc dựa trên billing period
+      const startDate = new Date();
+      const endDate = new Date();
 
-        // Cập nhật thông tin bổ sung nếu có
-        const updates: any = {};
-        if (formData.phone) updates.phone = formData.phone;
-        if (formData.organization) updates.organization = formData.organization;
-        if (formData.organizationDescription) updates.organization_description = formData.organizationDescription;
-
-        if (Object.keys(updates).length > 0) {
-          await updateCustomer(customerId, updates);
-        }
+      if (isAnnual && selectedPlan?.billingPeriod === 'monthly') {
+        endDate.setFullYear(endDate.getFullYear() + 1); // 1 year for annual billing
+        console.log('Annual billing - End date:', endDate.toISOString());
       } else {
-        // Tạo customer mới (chỉ khi chưa đăng nhập)
-        const customerResponse = await fetch('/api/customers/frontend', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            organization: formData.organization,
-            organization_description: formData.organizationDescription,
-          }),
-        });
-
-        if (!customerResponse.ok) {
-          throw new Error('Failed to create customer');
-        }
-
-        const newCustomerData = await customerResponse.json();
-        customerId = newCustomerData.doc.id;
-        customerData = newCustomerData.doc;
+        endDate.setMonth(endDate.getMonth() + 1); // 1 month for monthly billing
+        console.log('Monthly billing - End date:', endDate.toISOString());
       }
 
-      // 2. Tạo subscription
-      const subscriptionResponse = await fetch('/api/subscriptions/frontend', {
+      // Tạo subscription với đầy đủ thông tin
+      const subscriptionPayload = {
+        customer: customerId,
+        plan: formData.planId,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        status: 'pending',
+        autoRenew: true,
+      };
+
+      console.log('Creating subscription with payload:', subscriptionPayload);
+
+      const subscriptionResponse = await fetch('/api/subscriptions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          customer: customerId,
-          plan: formData.planId,
-          startDate: new Date().toISOString(),
-          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-          status: 'pending',
-          autoRenew: true,
-        }),
+        body: JSON.stringify(subscriptionPayload),
       });
+
+      const responseData = await subscriptionResponse.json();
+      console.log('Subscription response:', responseData);
 
       if (!subscriptionResponse.ok) {
-        throw new Error('Failed to create subscription');
+        throw new Error(responseData.error || 'Failed to create subscription');
       }
-
-      const subscriptionData = await subscriptionResponse.json();
-
-      // 3. Tạo invoice đầu tiên
-      const invoiceResponse = await fetch('/api/invoices/frontend', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customer: customerId,
-          subscription: subscriptionData.doc.id,
-          plan: formData.planId,
-          amount: selectedPlan?.price || 0,
-          currency: selectedPlan?.currency || 'USD',
-          billingPeriod: {
-            start: new Date().toISOString(),
-            end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          status: 'draft',
-          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Due in 7 days
-          items: [
-            {
-              description: `${selectedPlan?.name} Plan - ${isAnnual ? 'Annual' : 'Monthly'} Subscription`,
-              amount: selectedPlan?.price || 0,
-              quantity: 1,
-            },
-          ],
-          taxAmount: 0,
-          totalAmount: selectedPlan?.price || 0,
-        }),
-      });
 
       showToast(
           "Registration successful!",
@@ -436,11 +393,17 @@ export const Pricing = ({ className }: PricingProps) => {
       setSelectedPlan(null);
 
       // Redirect đến trang thank you hoặc dashboard
-      router.push(user ? '/dashboard' : '/thank-you');
+      setTimeout(() => {
+        router.push(user ? '/dashboard' : '/thank-you');
+      }, 2000);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
-      showToast("Registration failed", "There was an error creating your account. Please try again.", "destructive");
+      showToast(
+          "Registration failed",
+          error.message || "There was an error creating your account. Please try again.",
+          "destructive"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -449,10 +412,15 @@ export const Pricing = ({ className }: PricingProps) => {
   const switchToRegister = () => {
     setDialogMode('register');
     setLoginError(null);
+    setLoginForm({ email: '', password: '' });
   };
 
   const switchToLogin = () => {
     setDialogMode('login');
+    // Pre-fill email from registration form if available
+    if (formData.email) {
+      setLoginForm(prev => ({ ...prev, email: formData.email }));
+    }
   };
 
   if (loading) {
@@ -503,6 +471,7 @@ export const Pricing = ({ className }: PricingProps) => {
                 <div className="mt-8 flex justify-center">
                   <div className="flex items-center gap-3 rounded-lg border p-1">
                     <button
+                        type="button"
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                             !isAnnual
                                 ? "bg-primary text-primary-foreground"
@@ -513,6 +482,7 @@ export const Pricing = ({ className }: PricingProps) => {
                       Monthly
                     </button>
                     <button
+                        type="button"
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                             isAnnual
                                 ? "bg-primary text-primary-foreground"
@@ -530,7 +500,7 @@ export const Pricing = ({ className }: PricingProps) => {
             <div className="mt-8 grid items-start gap-6 text-start md:mt-12 md:grid-cols-3 lg:mt-20">
               {plans
                   .filter(plan => plan.status === 'active')
-                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
                   .map((plan) => {
                     const displayPrice = calculatePrice(plan);
                     const billingPeriod = getBillingPeriodDisplay(plan);
@@ -561,18 +531,16 @@ export const Pricing = ({ className }: PricingProps) => {
                               <div className="space-y-1">
                                 <div className="text-foreground text-2xl font-bold">
                                   {formatPrice(displayPrice, plan.currency)}
-                                  {isAnnual && plan.billingPeriod === 'monthly' && (
-                                      <span className="text-muted-foreground text-sm font-normal ml-1">
-                                per user/{billingPeriod}
-                              </span>
-                                  )}
+                                  <span className="text-muted-foreground text-sm font-normal ml-1">
+                              /{billingPeriod}
+                            </span>
                                 </div>
                                 {isAnnual && plan.billingPeriod === 'monthly' && (
                                     <div className="text-muted-foreground text-sm">
                                       Billed annually
                                     </div>
                                 )}
-                                {plan.billingPeriod !== 'monthly' && (
+                                {plan.billingPeriod !== 'monthly' && !isAnnual && (
                                     <div className="text-muted-foreground text-sm">
                                       Billed {plan.billingPeriod}
                                     </div>
@@ -602,6 +570,7 @@ export const Pricing = ({ className }: PricingProps) => {
                                 variant={isPopular ? "default" : "outline"}
                                 size="lg"
                                 onClick={() => handleGetStarted(plan)}
+                                type="button"
                             >
                               {user ? "Subscribe Now" : "Get Started"}
                             </Button>
@@ -613,18 +582,22 @@ export const Pricing = ({ className }: PricingProps) => {
           </div>
         </section>
 
-        {/* Registration/Login Modal - Custom implementation */}
+        {/* Registration/Login Modal */}
         {isDialogOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="bg-background rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between p-6 border-b">
                   <h2 className="text-xl font-semibold">
-                    {dialogMode === 'login' ? 'Login to Continue' : user ? 'Subscribe to' : 'Register for'} {selectedPlan?.name} Plan
+                    {dialogMode === 'login'
+                        ? 'Login to Continue'
+                        : `${user ? 'Subscribe to' : 'Register for'} ${selectedPlan?.name} Plan`
+                    }
                   </h2>
                   <button
                       onClick={() => setIsDialogOpen(false)}
                       className="text-muted-foreground hover:text-foreground"
                       disabled={isSubmitting || authLoading}
+                      type="button"
                   >
                     <X className="size-5" />
                   </button>
@@ -650,7 +623,7 @@ export const Pricing = ({ className }: PricingProps) => {
                               onChange={(e) => handleLoginInputChange('email', e.target.value)}
                               placeholder="Enter your email"
                               required
-                              disabled={authLoading}
+                              disabled={authLoading || isSubmitting}
                           />
                         </div>
 
@@ -663,7 +636,7 @@ export const Pricing = ({ className }: PricingProps) => {
                               onChange={(e) => handleLoginInputChange('password', e.target.value)}
                               placeholder="Enter your password"
                               required
-                              disabled={authLoading}
+                              disabled={authLoading || isSubmitting}
                           />
                         </div>
 
@@ -688,16 +661,16 @@ export const Pricing = ({ className }: PricingProps) => {
                             variant="outline"
                             className="flex-1"
                             onClick={() => setIsDialogOpen(false)}
-                            disabled={authLoading}
+                            disabled={authLoading || isSubmitting}
                         >
                           Cancel
                         </Button>
                         <Button
                             type="submit"
                             className="flex-1"
-                            disabled={authLoading}
+                            disabled={authLoading || isSubmitting}
                         >
-                          {authLoading ? (
+                          {(authLoading || isSubmitting) ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Logging in...
