@@ -39,20 +39,24 @@ export async function POST(request: NextRequest) {
 
         const subscription = subscriptions.docs[0];
         const plan = subscription.plan as any;
-        const monthlyUsage = subscription.monthlyUsage || {
-            roomsCreated: 0,
-            totalMinutes: 0,
-            participantsCount: 0,
-        };
 
+        // Safe handling of monthlyUsage with proper null checking
+        const monthlyUsage = subscription.monthlyUsage || {};
         const currentMonth = new Date().toISOString().slice(0, 7);
-        const isCurrentMonth = monthlyUsage.month === currentMonth;
+        const isCurrentMonth = monthlyUsage?.month === currentMonth;
 
-        const roomsCreated = isCurrentMonth ? monthlyUsage.roomsCreated : 0;
-        const totalMinutes = isCurrentMonth ? monthlyUsage.totalMinutes : 0;
+        // Safe access with nullish coalescing
+        const roomsCreated = isCurrentMonth ? (monthlyUsage?.roomsCreated ?? 0) : 0;
+        const totalMinutes = isCurrentMonth ? (monthlyUsage?.totalMinutes ?? 0) : 0;
+        const participantsCount = isCurrentMonth ? (monthlyUsage?.participantsCount ?? 0) : 0;
 
-        const remainingRooms = Math.max(0, plan.maxRoomsPerMonth - roomsCreated);
-        const remainingMinutes = Math.max(0, plan.maxMinutesPerMonth - totalMinutes);
+        // Safe access to plan properties
+        const maxRoomsPerMonth = plan?.maxRoomsPerMonth ?? 0;
+        const maxMinutesPerMonth = plan?.maxMinutesPerMonth ?? 0;
+        const maxDurationPerRoom = plan?.maxDuration ?? 0;
+
+        const remainingRooms = Math.max(0, maxRoomsPerMonth - roomsCreated);
+        const remainingMinutes = Math.max(0, maxMinutesPerMonth - totalMinutes);
 
         const limitations: string[] = [];
 
@@ -68,14 +72,34 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             hasActiveSubscription: true,
-            subscription,
-            plan,
+            subscription: {
+                id: subscription.id,
+                status: subscription.status,
+                startDate: subscription.startDate,
+                endDate: subscription.endDate,
+                autoRenew: subscription.autoRenew,
+                monthlyUsage: {
+                    month: monthlyUsage?.month || currentMonth,
+                    roomsCreated,
+                    totalMinutes,
+                    participantsCount,
+                }
+            },
+            plan: {
+                id: plan?.id,
+                name: plan?.name,
+                maxRoomsPerMonth,
+                maxMinutesPerMonth,
+                maxDuration: maxDurationPerRoom,
+                maxParticipants: plan?.maxParticipants ?? 0,
+            },
             usage: {
                 roomsCreated,
                 totalMinutes,
-                maxRoomsPerMonth: plan.maxRoomsPerMonth,
-                maxMinutesPerMonth: plan.maxMinutesPerMonth,
-                maxDurationPerRoom: plan.maxDuration,
+                participantsCount,
+                maxRoomsPerMonth,
+                maxMinutesPerMonth,
+                maxDurationPerRoom,
                 remainingRooms,
                 remainingMinutes,
             },

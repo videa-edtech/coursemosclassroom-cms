@@ -7,25 +7,26 @@ import RoomManagement from './panels/RoomManagement';
 import Analytics from './panels/Analytics';
 import Settings from './panels/Settings';
 import SubscriptionManagement from './panels/SubscriptionManagement';
-import { useAuth } from '@/contexts/AuthContext'; // Thêm import
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardPanelProps {
     user: FlatUser;
     onLogout: () => void;
 }
 
-type PanelType = 'profile' | 'rooms' | 'analytics' | 'settings' | 'subscriptions'; // Sửa lỗi chính tả
+type PanelType = 'profile' | 'rooms' | 'analytics' | 'settings' | 'subscriptions';
 
 const DashboardPanel: React.FC<DashboardPanelProps> = ({ user, onLogout }) => {
     const [activePanel, setActivePanel] = useState<PanelType>('profile');
-    const { customerId } = useAuth(); // Lấy customerId từ AuthContext
+    const { customerId } = useAuth();
 
+    // FIXED: Remove customerId from SubscriptionManagement if it doesn't accept it
     const panels = {
         profile: <UserProfile user={user} />,
-        rooms: <RoomManagement user={user} customerId={customerId} />, // Truyền customerId
+        rooms: customerId ? <RoomManagement user={user} customerId={customerId} /> : <div>Loading customer information...</div>,
         analytics: <Analytics user={user} />,
         settings: <Settings user={user} onLogout={onLogout} />,
-        subscriptions: <SubscriptionManagement user={user} customerId={customerId} />
+        subscriptions: <SubscriptionManagement user={user} /> // FIXED: Remove customerId prop
     };
 
     return (
@@ -37,9 +38,6 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ user, onLogout }) => {
                         <div className="flex items-center space-x-4">
                             <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
                             <span className="text-sm text-gray-500">Welcome, {user.name}</span>
-                            {/*{customerId && (*/}
-                            {/*    <span className="text-xs text-gray-400">Customer ID: {customerId}</span>*/}
-                            {/*)}*/}
                         </div>
                         <button
                             onClick={onLogout}

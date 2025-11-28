@@ -31,8 +31,7 @@ export async function POST(request: NextRequest) {
                 collection: 'customers',
                 data: {
                     email: email,
-                    name: email.split('@')[0], // Tạo tên từ email
-                    status: 'active',
+                    name: email.split('@')[0],
                 },
             });
 

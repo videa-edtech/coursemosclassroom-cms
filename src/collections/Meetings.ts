@@ -5,11 +5,11 @@ export const Meetings: CollectionConfig = {
     slug: 'meetings',
     admin: {
         useAsTitle: 'name',
-        defaultColumns: ['name', 'customer_id', 'flat_room_link', 'status'],
+        defaultColumns: ['name', 'customer', 'flat_room_link', 'status'],
     },
     fields: [
         {
-            name: 'customer_id',
+            name: 'customer',
             type: 'relationship',
             relationTo: 'customers',
             required: true,
@@ -18,7 +18,7 @@ export const Meetings: CollectionConfig = {
             },
         },
         {
-            name: 'subscription_id',
+            name: 'subscription',
             type: 'relationship',
             relationTo: 'subscriptions',
             required: true,
@@ -52,12 +52,12 @@ export const Meetings: CollectionConfig = {
         },
         {
             name: 'start_time',
-            type: 'date',
+            type: 'text',
             required: true,
         },
         {
             name: 'end_time',
-            type: 'date',
+            type: 'text',
             required: true,
         },
         {

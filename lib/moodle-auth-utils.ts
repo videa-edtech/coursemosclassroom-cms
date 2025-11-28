@@ -46,7 +46,7 @@ export const checkMeetingOwner = async (meetingId: string, customerId: string): 
             where: {
                 and: [
                     { flat_room_id: { equals: meetingId } },
-                    { customer_id: { equals: customerId } }
+                    { customer: { equals: customerId } }
                 ]
             },
             limit: 1,

@@ -302,7 +302,7 @@ export const Subscriptions: CollectionConfig = {
                         // Fetch plan details
                         const plan = await req.payload.findByID({
                             collection: 'plans',
-                            id: planId.toString(), // findByID handles string conversion
+                            id: planId.toString(),
                         });
 
                         if (!plan) {
@@ -318,14 +318,23 @@ export const Subscriptions: CollectionConfig = {
                             customerId = customerId.id || customerId.value;
                         }
 
-                        // Prepare Invoice Data
+                        // FIXED: Generate invoice number and include all required fields
+                        const generateInvoiceNumber = () => {
+                            const date = new Date();
+                            const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+                            const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+                            return `INV-${dateStr}-${random}`;
+                        };
+
+                        // FIXED: Prepare Invoice Data with all required fields including invoiceNumber
                         const invoiceData = {
+                            invoiceNumber: generateInvoiceNumber(), // FIXED: Add required invoiceNumber field
                             customer: customerId,
                             subscription: doc.id,
-                            plan: planId, // GIỮ NGUYÊN TYPE ID (Number/String) CỦA DB
+                            plan: planId,
                             amount: plan.price,
                             currency: plan.currency,
-                            status: 'pending',
+                            status: 'pending' as const,
                             billingPeriod: {
                                 start: doc.startDate,
                                 end: doc.endDate,
@@ -346,11 +355,12 @@ export const Subscriptions: CollectionConfig = {
 
                         console.log('📝 Creating initial invoice...');
 
-                        // CREATE INVOICE - MUST PASS `req` FOR TRANSACTION CONTEXT
+                        // FIXED: CREATE INVOICE with draft property
                         const createdInvoice = await req.payload.create({
                             collection: 'invoices',
                             data: invoiceData,
-                            req, // <--- QUAN TRỌNG: Chia sẻ transaction để tránh lỗi Foreign Key
+                            draft: false,
+                            req,
                         });
 
                         console.log(`✅ Invoice created successfully: ${createdInvoice.invoiceNumber}`);
@@ -411,16 +421,25 @@ export const Subscriptions: CollectionConfig = {
                                 customerId = customerId.id || customerId.value;
                             }
 
-                            // CREATE RENEWAL INVOICE
+                            // FIXED: Generate invoice number for renewal invoice
+                            const generateInvoiceNumber = () => {
+                                const date = new Date();
+                                const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+                                const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+                                return `INV-${dateStr}-${random}`;
+                            };
+
+                            // FIXED: CREATE RENEWAL INVOICE with all required fields including invoiceNumber
                             await req.payload.create({
                                 collection: 'invoices',
                                 data: {
+                                    invoiceNumber: generateInvoiceNumber(), // FIXED: Add required invoiceNumber field
                                     customer: customerId,
                                     subscription: doc.id,
-                                    plan: planId, // Giữ nguyên ID gốc
+                                    plan: planId,
                                     amount: plan.price,
                                     currency: plan.currency,
-                                    status: 'pending',
+                                    status: 'pending' as const,
                                     billingPeriod: {
                                         start: newStartDate.toISOString(),
                                         end: newEndDate.toISOString(),
@@ -438,7 +457,8 @@ export const Subscriptions: CollectionConfig = {
                                     totalAmount: plan.price,
                                     notes: 'Auto-generated invoice for subscription renewal',
                                 },
-                                req, // <--- QUAN TRỌNG: Luôn truyền req
+                                draft: false,
+                                req,
                             });
 
                             console.log(`✅ Renewal invoice created for subscription ${doc.id}`);

@@ -321,8 +321,8 @@ export interface Plan {
  */
 export interface Meeting {
   id: number;
-  customer_id: number | Customer;
-  subscription_id: number | Subscription;
+  customer: number | Customer;
+  subscription: number | Subscription;
   name: string;
   moodle_course_id?: string | null;
   moodle_user_email?: string | null;
@@ -598,8 +598,8 @@ export interface SubscriptionsSelect<T extends boolean = true> {
  * via the `definition` "meetings_select".
  */
 export interface MeetingsSelect<T extends boolean = true> {
-  customer_id?: T;
-  subscription_id?: T;
+  customer?: T;
+  subscription?: T;
   name?: T;
   moodle_course_id?: T;
   moodle_user_email?: T;

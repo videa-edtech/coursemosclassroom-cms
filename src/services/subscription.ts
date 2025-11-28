@@ -21,7 +21,7 @@ export class SubscriptionService {
     static async checkUserSubscription(customerId: string): Promise<SubscriptionCheck> {
         try {
             // Find active subscription for customer
-            const response = await fetch('/dashboard-api/subscriptions/check', {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/dashboard-api/subscriptions/check`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -46,7 +46,7 @@ export class SubscriptionService {
         participantsCount: number = 0
     ): Promise<void> {
         try {
-            const response = await fetch('/dashboard-api/subscriptions/usage', {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/dashboard-api/subscriptions/usage`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

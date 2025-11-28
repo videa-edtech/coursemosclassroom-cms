@@ -46,13 +46,6 @@ export const Invoices: CollectionConfig = {
             type: 'relationship',
             relationTo: 'plans',
             required: true,
-            // Thêm validate function để đảm bảo plan hợp lệ
-            validate: (value, { operation }) => {
-                if (operation === 'create' && !value) {
-                    return 'Plan is required';
-                }
-                return true;
-            },
         },
         {
             name: 'amount',
@@ -208,7 +201,12 @@ export const Invoices: CollectionConfig = {
                             console.log('✅ Plan validated:', plan.name);
                         } catch (error) {
                             console.error('❌ Error validating plan:', error);
-                            throw new Error(`Invalid plan: ${error.message}`);
+                            // FIXED: Proper error handling for unknown type
+                            if (error instanceof Error) {
+                                throw new Error(`Invalid plan: ${error.message}`);
+                            } else {
+                                throw new Error('Invalid plan: Unknown error occurred');
+                            }
                         }
                     }
 
@@ -252,6 +250,30 @@ export const Invoices: CollectionConfig = {
                 });
 
                 if (operation === 'create') {
+                    // Validate plan exists
+                    if (!data.plan) {
+                        throw new Error('Plan is required for invoice creation');
+                    }
+
+                    try {
+                        const plan = await req.payload.findByID({
+                            collection: 'plans',
+                            id: data.plan.toString(),
+                        });
+
+                        if (!plan) {
+                            throw new Error(`Plan with ID ${data.plan} not found`);
+                        }
+                    } catch (error) {
+                        console.error('❌ Error validating plan in beforeChange:', error);
+                        // FIXED: Proper error handling for unknown type
+                        if (error instanceof Error) {
+                            throw new Error(`Invalid plan: ${error.message}`);
+                        } else {
+                            throw new Error('Invalid plan: Unknown error occurred');
+                        }
+                    }
+
                     // Đảm bảo có ít nhất một item mặc định
                     if (!data.items || data.items.length === 0) {
                         data.items = [
@@ -328,6 +350,12 @@ export const Invoices: CollectionConfig = {
                         console.log(`✅ Subscription ${doc.subscription} activated for paid invoice ${doc.invoiceNumber}`);
                     } catch (error) {
                         console.error('❌ Error updating subscription status:', error);
+                        // FIXED: Proper error handling for unknown type
+                        if (error instanceof Error) {
+                            console.error('Error details:', error.message);
+                        } else {
+                            console.error('Unknown error occurred while updating subscription status');
+                        }
                     }
                 }
 
@@ -347,6 +375,12 @@ export const Invoices: CollectionConfig = {
                         console.log(`✅ Subscription ${doc.subscription} deactivated for ${doc.status} invoice ${doc.invoiceNumber}`);
                     } catch (error) {
                         console.error('❌ Error deactivating subscription:', error);
+                        // FIXED: Proper error handling for unknown type
+                        if (error instanceof Error) {
+                            console.error('Error details:', error.message);
+                        } else {
+                            console.error('Unknown error occurred while deactivating subscription');
+                        }
                     }
                 }
             },

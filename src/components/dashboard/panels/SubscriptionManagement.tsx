@@ -251,7 +251,7 @@ ${invoice.items.map(item =>
             `- ${item.description}: ${formatCurrency(item.amount, invoice.currency)} x ${item.quantity}`
         ).join('\n')}
 
-Subtotal: ${formatCurrency(invoice.subtotal, invoice.currency)}
+Subtotal: ${formatCurrency(invoice.amount, invoice.currency)}
 Tax: ${formatCurrency(invoice.taxAmount, invoice.currency)}
 Total: ${formatCurrency(invoice.totalAmount, invoice.currency)}
 

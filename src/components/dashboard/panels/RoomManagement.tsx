@@ -10,7 +10,7 @@ import { SubscriptionService, SubscriptionCheck } from '@/services/subscription'
 
 interface RoomManagementProps {
     user: FlatUser;
-    customerId: string;
+    customerId: any;
 }
 
 interface CreateRoomForm {
@@ -198,8 +198,8 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
             setError('End time must be after start time');
             return;
         }
-
-        if (duration > (subscriptionCheck.plan?.maxDuration || 60)) {
+        const maxDuration = subscriptionCheck.plan?.maxDuration || 0;
+        if (duration > maxDuration) {
             setError(`Room duration cannot exceed ${subscriptionCheck.plan?.maxDuration} minutes according to your plan`);
             return;
         }
@@ -247,8 +247,8 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        customer_id: customerId,
-                        subscription_id: subscriptionCheck.subscription?.id,
+                        customer: parseInt(customerId),
+                        subscription: subscriptionCheck.subscription?.id,
                         name: formData.title,
                         flat_room_id: room.data.roomUUID,
                         flat_room_link: `${process.env.NEXT_PUBLIC_FLAT_CMS_BASE_URL}/join/${room.data.roomUUID}`,
@@ -263,7 +263,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
 
                 // Update subscription usage
                 await SubscriptionService.updateUsage(
-                    subscriptionCheck.subscription?.id!,
+                    subscriptionCheck.subscription!.id.toString(),
                     duration
                 );
 
