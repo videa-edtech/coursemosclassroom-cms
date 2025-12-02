@@ -9,7 +9,10 @@ import {
     FlatRoom,
     TotalMinutesResponse,
     RoomParticipantsSummary,
-    OrganizationUsersSummary
+    OrganizationUsersSummary,
+    UserInOutRecord,
+    UserInOutResponse,
+    UserInOutSummary
 } from './types';
 import {FlatRoomResponse} from "@/services/flat/types";
 
@@ -162,5 +165,24 @@ export class FlatService {
         }
     ): Promise<OrganizationUsersSummary> {
         return this.user.getTotalParticipantsForAllRoomUnderOrganization(token, options);
+    }
+
+    async getRoomUserInOut(roomUUID: string, token: string, options?: {
+        page?: number;
+        limit?: number;
+    }): Promise<UserInOutSummary> {
+        return this.room.getRoomUserInOut(roomUUID, token, options);
+    }
+
+    async getAllRoomUserInOut(roomUUID: string, token: string): Promise<UserInOutSummary> {
+        return this.room.getAllRoomUserInOut(roomUUID, token);
+    }
+
+    async getUserInOutSummary(roomUUID: string, token: string) {
+        return this.room.getUserInOutSummary(roomUUID, token);
+    }
+
+    async getUserInOutAnalysis(roomUUID: string, token: string) {
+        return this.room.getUserInOutAnalysis(roomUUID, token);
     }
 }

@@ -142,3 +142,28 @@ export interface RoomParticipantsSummary {
     participants: RoomParticipant[];
     roomTitle: string;
 }
+
+export interface UserInOutRecord {
+    created_at: string;
+    updated_at: string;
+    room_uuid: string;
+    user_uuid: string;
+    time_in: string; // ISO string
+    time_out: string | null; // ISO string, null if still in room
+    is_delete: number;
+    room_title: string;
+    user_name: string;
+    duration_minutes: number; // duration tính bằng phút
+}
+
+export interface UserInOutResponse {
+    status: number;
+    data: UserInOutRecord[];
+}
+
+export interface UserInOutSummary {
+    totalRecords: number;
+    records: UserInOutRecord[];
+    roomUUID: string;
+    roomTitle: string;
+}

@@ -7,7 +7,7 @@ import { flatService } from '@/services/flat';
 import { RoomItem } from '@/services/flat/types';
 import { useAuth } from "@/contexts/AuthContext";
 import { SubscriptionService, SubscriptionCheck } from '@/services/subscription';
-
+import { generateClientKey } from '../../../../src/services/flat/utils/crypto';
 interface RoomManagementProps {
     user: FlatUser;
     customerId: any;
@@ -327,9 +327,35 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
         );
     };
 
-    const joinRoom = (roomUUID: string) => {
-        const joinUrl = `${process.env.NEXT_PUBLIC_FLAT_CMS_BASE_URL}/join/${roomUUID}?email=${flatUser.email}&clientKey=${flatUser.clientKey}`;
-        window.open(joinUrl, '_blank');
+    const joinRoom = async (roomUUID: string) => {
+        try {
+            // Gọi API để lấy token
+            const response = await fetch('/dashboard-api/room-management/create-join-room-token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    roomUUID,
+                    email: flatUser.email,
+                    clientKey: generateClientKey(flatUser.clientKey)
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                // Mở URL với token
+                window.open(result.joinUrl, '_blank');
+            } else {
+            }
+
+        } catch (error) {
+            console.error('Error joining room:', error);
+            // Fallback khi có lỗi
+            const fallbackUrl = `${process.env.NEXT_PUBLIC_FLAT_CMS_BASE_URL}/join/${roomUUID}?email=${encodeURIComponent(flatUser.email)}&clientKey=${flatUser.clientKey}`;
+            window.open(fallbackUrl, '_blank');
+        }
     };
 
     const getDefaultStartTime = () => {
@@ -765,17 +791,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                                                         Join Room
                                                     </button>
                                                 )}
-                                                <button
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(
-                                                            `${process.env.NEXT_PUBLIC_FLAT_CMS_BASE_URL}/join/${room.room_uuid}`
-                                                        );
-                                                        alert('Join link copied to clipboard!');
-                                                    }}
-                                                    className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
-                                                >
-                                                    Copy Link
-                                                </button>
+
                                                 {canStopRoom(room) && (
                                                     <button
                                                         onClick={() => handleStopRoom(room.room_uuid, room.title)}

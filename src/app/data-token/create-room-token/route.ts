@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
     try {
         const { title, type, beginTime, endTime, email, clientKey } = await request.json();
 
-        const privateKey = process.env.JWT_PRIVATE_KEY!;
+        const privateKey = process.env.JWT_PRIVATE_KEY;
 
         const token = jwt.sign(
             {
