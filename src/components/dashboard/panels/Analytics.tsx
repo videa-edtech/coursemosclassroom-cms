@@ -123,7 +123,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-[#fcfcfa] rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Modal Header */}
                 <div className="flex justify-between items-center p-6 border-b">
                     <div>
@@ -752,7 +752,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {[...Array(3)].map((_, index) => (
-                            <div key={index} className="bg-white border rounded-lg p-4 text-center">
+                            <div key={index} className="bg-[#fcfcfa] border rounded-lg p-4 text-center">
                                 <div className="animate-pulse">
                                     <div className="h-8 bg-gray-300 rounded mb-2"></div>
                                     <div className="h-4 bg-gray-200 rounded"></div>
@@ -761,7 +761,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
                         ))}
                     </div>
 
-                    <div className="bg-white border rounded-lg p-6">
+                    <div className="bg-[#fcfcfa] border rounded-lg p-6">
                         <div className="animate-pulse">
                             <div className="h-6 bg-gray-300 rounded w-1/3 mb-4"></div>
                             <div className="h-4 bg-gray-200 rounded mb-2"></div>
@@ -844,7 +844,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
                     {/* Stats Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {/* Rooms Created */}
-                        <div className="bg-white border rounded-lg p-4 text-center shadow-sm">
+                        <div className="bg-[#fcfcfa] border rounded-lg p-4 text-center shadow-sm">
                             <div className="text-3xl font-bold text-blue-600">
                                 {totalActiveRooms}
                             </div>
@@ -860,7 +860,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
                         </div>
 
                         {/* Total Participants */}
-                        <div className="bg-white border rounded-lg p-4 text-center shadow-sm">
+                        <div className="bg-[#fcfcfa] border rounded-lg p-4 text-center shadow-sm">
                             {getParticipantsDisplay()}
                             <div className="text-sm text-gray-600">Total Participants</div>
                             <div className="text-xs text-gray-400 mt-1">
@@ -869,7 +869,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
                         </div>
 
                         {/* Total Usage Time */}
-                        <div className="bg-white border rounded-lg p-4 text-center shadow-sm">
+                        <div className="bg-[#fcfcfa] border rounded-lg p-4 text-center shadow-sm">
                             {getUsageTimeDisplay()}
                             <div className="text-sm text-gray-600">Total Usage Time</div>
                             <div className="text-xs text-gray-400 mt-1">
@@ -880,7 +880,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
                     </div>
 
                     {/* Detailed Statistics */}
-                    <div className="bg-white border rounded-lg p-6 shadow-sm">
+                    <div className="bg-[#fcfcfa] border rounded-lg p-6 shadow-sm">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-semibold">Usage Statistics</h3>
                             {lastUpdated && (

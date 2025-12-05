@@ -30,9 +30,9 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ user, onLogout }) => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen from-primary/50 via-background to-background rounded-t-4xl rounded-b-2xl bg-linear-to-b via-90%">
             {/* Header */}
-            <header className="bg-white shadow-sm border-b">
+            <header className="bg-background/70 absolute left-1/2 z-50 container mx-auto -translate-x-1/2 rounded-lg border backdrop-blur-md transition-all duration-300 top-5 lg:top-10">
                 <div className="container mx-auto px-4 py-4">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center space-x-4">
@@ -49,10 +49,10 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ user, onLogout }) => {
                 </div>
             </header>
 
-            <div className="container mx-auto px-4 py-6">
+            <div className="container mx-auto py-24 lg:py-28 lg:pt-34 px-0">
                 <div className="flex flex-col lg:flex-row gap-6">
                     {/* Sidebar Navigation */}
-                    <nav className="lg:w-64 bg-white rounded-lg shadow-sm p-4 h-fit">
+                    <nav className="lg:w-64 bg-[#fcfcfa] rounded-lg shadow-sm p-4 h-fit">
                         <ul className="space-y-2">
                             <li>
                                 <button
@@ -146,7 +146,7 @@ const DashboardPanel: React.FC<DashboardPanelProps> = ({ user, onLogout }) => {
 
                     {/* Main Content Panel */}
                     <main className="flex-1">
-                        <div className="bg-white rounded-lg shadow-sm p-6">
+                        <div className="bg-[#fcfcfa] rounded-lg shadow-sm p-6">
                             {panels[activePanel]}
                         </div>
                     </main>

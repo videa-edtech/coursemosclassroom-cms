@@ -360,7 +360,7 @@ Thank you for your business!
                         </div>
                     ) : (
                         subscriptions.map((subscription) => (
-                            <div key={subscription.id} className="bg-white border rounded-lg p-6">
+                            <div key={subscription.id} className="bg-[#fcfcfa] border rounded-lg p-6">
                                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-3">
@@ -455,7 +455,7 @@ Thank you for your business!
                             <p className="mt-1 text-sm text-gray-500">Your invoices will appear here.</p>
                         </div>
                     ) : (
-                        <div className="bg-white border rounded-lg overflow-hidden">
+                        <div className="bg-[#fcfcfa] border rounded-lg overflow-hidden">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                 <tr>
@@ -479,7 +479,7 @@ Thank you for your business!
                                     </th>
                                 </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
+                                <tbody className="bg-[#fcfcfa] divide-y divide-gray-200">
                                 {invoices.map((invoice) => (
                                     <tr key={invoice.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

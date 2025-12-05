@@ -445,25 +445,59 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
         return (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-lg font-semibold text-green-800">
+                    <div className="w-full">
+                        <h3 className="text-lg font-semibold text-green-800 mb-2">
                             {subscriptionCheck.plan?.name} Plan
                         </h3>
-                        <div className="text-green-700 mt-1 space-y-1">
-                            <p>
-                                <strong>Rooms:</strong> {subscriptionCheck.usage?.remainingRooms} / {subscriptionCheck.usage?.maxRoomsPerMonth} remaining
-                            </p>
-                            <p>
-                                <strong>Minutes:</strong> {subscriptionCheck.usage?.remainingMinutes} / {subscriptionCheck.usage?.maxMinutesPerMonth} remaining
-                            </p>
-                            <p className="text-green-600 text-sm">
+
+                        <div className="space-y-2">
+                            {/* Rooms Progress Bar */}
+                            <div>
+                                <div className="flex justify-between text-sm text-green-700 mb-1">
+                                    <span>Rooms Usage</span>
+                                    <span className="font-medium">{subscriptionCheck.usage?.remainingRooms} / {subscriptionCheck.usage?.maxRoomsPerMonth}</span>
+                                </div>
+                                <div className="w-full bg-green-300 rounded-full h-2.5">
+                                    <div
+                                        className="bg-green-600 h-2.5 rounded-full"
+                                        style={{
+                                            width: `${Math.min(
+                                                ((subscriptionCheck.usage?.maxRoomsPerMonth - subscriptionCheck.usage?.remainingRooms) / subscriptionCheck.usage?.maxRoomsPerMonth) * 100,
+                                                100
+                                            )}%`
+                                        }}
+                                    ></div>
+                                </div>
+                            </div>
+
+                            {/* Minutes Progress Bar */}
+                            <div>
+                                <div className="flex justify-between text-sm text-green-700 mb-1">
+                                    <span>Minutes Usage</span>
+                                    <span className="font-medium">{subscriptionCheck.usage?.remainingMinutes} / {subscriptionCheck.usage?.maxMinutesPerMonth}</span>
+                                </div>
+                                <div className="w-full bg-green-300 rounded-full h-2.5">
+                                    <div
+                                        className="bg-green-600 h-2.5 rounded-full"
+                                        style={{
+                                            width: `${Math.min(
+                                                ((subscriptionCheck.usage?.maxMinutesPerMonth - subscriptionCheck.usage?.remainingMinutes) / subscriptionCheck.usage?.maxMinutesPerMonth) * 100,
+                                                100
+                                            )}%`
+                                        }}
+                                    ></div>
+                                </div>
+                            </div>
+
+                            <p className="text-green-600 text-sm pt-2">
                                 <strong>Max duration per room:</strong> {subscriptionCheck.usage?.maxDurationPerRoom} minutes
                             </p>
                         </div>
                     </div>
+
                     <button
                         onClick={() => window.open('/pricing', '_blank')}
-                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
+                        className="ml-6 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                     >
                         Manage Plan
                     </button>
@@ -514,34 +548,34 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
 
             <div className="space-y-6">
                 {/* Room Statistics */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    {tabs.map(tab => (
-                        <div
-                            key={tab.id}
-                            className={`p-4 rounded-lg text-center cursor-pointer transition-all ${
-                                activeTab === tab.id
-                                    ? 'bg-blue-100 border-2 border-blue-500'
-                                    : 'bg-gray-50 hover:bg-gray-100'
-                            }`}
-                            onClick={() => setActiveTab(tab.id)}
-                        >
-                            <div className={`text-2xl font-bold ${
-                                activeTab === tab.id ? 'text-blue-600' : 'text-gray-600'
-                            }`}>
-                                {tab.count}
-                            </div>
-                            <div className={`text-sm ${
-                                activeTab === tab.id ? 'text-blue-800' : 'text-gray-800'
-                            }`}>
-                                {tab.label}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                {/*<div className="grid grid-cols-1 md:grid-cols-5 gap-4">*/}
+                {/*    {tabs.map(tab => (*/}
+                {/*        <div*/}
+                {/*            key={tab.id}*/}
+                {/*            className={`p-4 rounded-lg text-center cursor-pointer transition-all ${*/}
+                {/*                activeTab === tab.id*/}
+                {/*                    ? 'bg-blue-100 border-2 border-blue-500'*/}
+                {/*                    : 'bg-gray-50 hover:bg-gray-100'*/}
+                {/*            }`}*/}
+                {/*            onClick={() => setActiveTab(tab.id)}*/}
+                {/*        >*/}
+                {/*            <div className={`text-2xl font-bold ${*/}
+                {/*                activeTab === tab.id ? 'text-blue-600' : 'text-gray-600'*/}
+                {/*            }`}>*/}
+                {/*                {tab.count}*/}
+                {/*            </div>*/}
+                {/*            <div className={`text-sm ${*/}
+                {/*                activeTab === tab.id ? 'text-blue-800' : 'text-gray-800'*/}
+                {/*            }`}>*/}
+                {/*                {tab.label}*/}
+                {/*            </div>*/}
+                {/*        </div>*/}
+                {/*    ))}*/}
+                {/*</div>*/}
 
                 {/* Create Room Button - Only show if user can create rooms */}
                 {!showCreateForm && subscriptionCheck?.canCreateRoom && (
-                    <div className="bg-white border rounded-lg p-6 text-center">
+                    <div className="bg-[#fcfcfa] border rounded-lg p-6 text-center">
                         <button
                             onClick={() => setShowCreateForm(true)}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors text-lg font-semibold"
@@ -556,7 +590,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
 
                 {/* Create Room Form */}
                 {showCreateForm && subscriptionCheck?.canCreateRoom && (
-                    <div className="bg-white border rounded-lg p-6">
+                    <div className="bg-[#fcfcfa] border rounded-lg p-6">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-semibold">Create New Room</h3>
                             <button
@@ -678,7 +712,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                 {/* ... (giữ nguyên phần tabs và room list) ... */}
 
                 {/* Status Tabs */}
-                <div className="bg-white border rounded-lg">
+                <div className="bg-[#fcfcfa] border rounded-lg">
                     {/* Tabs Header */}
                     <div className="border-b">
                         <div className="flex overflow-x-auto">
@@ -765,20 +799,20 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                                                     )}
                                                 </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
-                                                    <div>
-                                                        <strong>Type:</strong> {room.room_type}
-                                                    </div>
+                                                    {/*<div>*/}
+                                                    {/*    <strong>Type:</strong> {room.room_type}*/}
+                                                    {/*</div>*/}
                                                     <div>
                                                         <strong>UUID:</strong> {room.room_uuid}
+                                                    </div>
+                                                    <div>
+                                                        <strong>Duration:</strong> {Math.round((new Date(room.end_time).getTime() - new Date(room.begin_time).getTime()) / (60 * 1000))} minutes
                                                     </div>
                                                     <div>
                                                         <strong>Start:</strong> {formatDate(room.begin_time)}
                                                     </div>
                                                     <div>
                                                         <strong>End:</strong> {formatDate(room.end_time)}
-                                                    </div>
-                                                    <div>
-                                                        <strong>Duration:</strong> {Math.round((new Date(room.end_time).getTime() - new Date(room.begin_time).getTime()) / (60 * 1000))} minutes
                                                     </div>
                                                 </div>
                                             </div>

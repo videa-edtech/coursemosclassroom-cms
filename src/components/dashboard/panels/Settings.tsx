@@ -14,7 +14,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onLogout }) => {
             <h2 className="text-2xl font-bold mb-6">Settings</h2>
 
             <div className="space-y-6">
-                <div className="bg-white border rounded-lg p-6">
+                <div className="bg-[#fcfcfa] border rounded-lg p-6">
                     <h3 className="text-lg font-semibold mb-4">Account Settings</h3>
 
                     <div className="space-y-4">
@@ -44,7 +44,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onLogout }) => {
                     </div>
                 </div>
 
-                <div className="bg-white border rounded-lg p-6">
+                <div className="bg-[#fcfcfa] border rounded-lg p-6">
                     <h3 className="text-lg font-semibold mb-4 text-red-600">Danger Zone</h3>
 
                     <div className="flex justify-between items-center">
