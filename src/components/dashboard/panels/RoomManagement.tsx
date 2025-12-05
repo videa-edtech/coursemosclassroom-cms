@@ -462,7 +462,8 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                                         className="bg-green-600 h-2.5 rounded-full"
                                         style={{
                                             width: `${Math.min(
-                                                ((subscriptionCheck.usage?.maxRoomsPerMonth - subscriptionCheck.usage?.remainingRooms) / subscriptionCheck.usage?.maxRoomsPerMonth) * 100,
+                                                (((subscriptionCheck.usage?.maxRoomsPerMonth ?? 0) - (subscriptionCheck.usage?.remainingRooms ?? 0)) /
+                                                    (subscriptionCheck.usage?.maxRoomsPerMonth || 1)) * 100,
                                                 100
                                             )}%`
                                         }}
@@ -481,7 +482,8 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                                         className="bg-green-600 h-2.5 rounded-full"
                                         style={{
                                             width: `${Math.min(
-                                                ((subscriptionCheck.usage?.maxMinutesPerMonth - subscriptionCheck.usage?.remainingMinutes) / subscriptionCheck.usage?.maxMinutesPerMonth) * 100,
+                                                (((subscriptionCheck.usage?.maxMinutesPerMonth ?? 0) - (subscriptionCheck.usage?.remainingMinutes ?? 0)) /
+                                                    (subscriptionCheck.usage?.maxMinutesPerMonth || 1)) * 100,
                                                 100
                                             )}%`
                                         }}
