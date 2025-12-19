@@ -178,6 +178,13 @@ export class FlatService {
         return this.room.getRoomUserInOut(roomUUID, token, options);
     }
 
+    async getRoomUserInOutByToken(roomUUID: string, token: string, options?: {
+        page?: number;
+        limit?: number;
+    }): Promise<UserInOutSummary> {
+        return this.room.getRoomUserInOutByToken(roomUUID, token, options);
+    }
+
     async getAllRoomUserInOut(roomUUID: string, token: string): Promise<UserInOutSummary> {
         return this.room.getAllRoomUserInOut(roomUUID, token);
     }

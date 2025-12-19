@@ -548,6 +548,57 @@ export class RoomService {
         }
     }
 
+    async getRoomUserInOutByToken(roomUUID: string, token: string, options?: {
+        page?: number;
+        limit?: number;
+    }): Promise<UserInOutSummary> {
+        try {
+            console.log('Fetching user in-out records for roomUUID:', roomUUID);
+            console.log('Using baseURL:', this.baseURL);
+
+            // Lưu ý: API này dùng POST method với body param
+            const response = await axios.post<UserInOutResponse>(
+                `${this.baseURL}/v1/user/organization/room/time-in-out-by-user-by-token`,
+                {
+                    room_uuid: roomUUID,
+                    token,
+                    page: options?.page || 1,
+                    limit: options?.limit || 50
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                }
+            );
+
+            if (response.data.status !== 0) {
+                throw new Error('Failed to fetch user in-out records');
+            }
+
+            console.log('User in-out records fetched successfully:', {
+                recordsCount: response.data.data.length
+            });
+
+            // Kiểm tra nếu có dữ liệu để lấy roomTitle
+            const roomTitle = response.data.data.length > 0
+                ? response.data.data[0].room_title
+                : 'Unknown Room';
+
+            return {
+                totalRecords: response.data.data.length,
+                records: response.data.data,
+                roomUUID: roomUUID,
+                roomTitle: roomTitle
+            };
+
+        } catch (error: any) {
+            console.error('Error fetching user in-out records:', error);
+            console.error('Error response:', error.response?.data);
+            throw new Error(`Failed to fetch user in-out records: ${error.response?.data?.message || error.message}`);
+        }
+    }
+
     /**
      * Lấy tất cả user in-out records của một phòng (tự động lấy tất cả trang)
      */
