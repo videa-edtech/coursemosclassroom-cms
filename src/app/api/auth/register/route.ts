@@ -28,6 +28,40 @@ export async function POST(request: NextRequest) {
                 password: password
             },
         });
+
+        try {
+            const loginResult = await flatService.login({ email, password });
+
+            // 4. Cập nhật secret_key với clientKey từ login
+            const updatedCustomer = await payload.update({
+                collection: 'customers',
+                id: customer.id,
+                data: {
+                    secret_key: loginResult.clientKey
+                }
+            });
+            user.clientKey = loginResult.clientKey;
+            // 5. Trả về kết hợp cả register và login data
+            return NextResponse.json({
+                status: 0,
+                data: {
+                    ...user,
+                    loginData: loginResult,
+                    customer: updatedCustomer
+                }
+            });
+
+        } catch (loginError: any) {
+            console.warn('Register successful but auto-login failed:', loginError);
+
+            return NextResponse.json({
+                status: 0,
+                data: user,
+                warning: 'Registration successful but auto-login failed. Please login manually.',
+                customer: customer
+            });
+        }
+
         return NextResponse.json({
             status: 0,
             data: user

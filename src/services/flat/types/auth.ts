@@ -57,3 +57,20 @@ export interface RegisterResponse {
         isAnonymous: boolean;
     };
 }
+export interface UpdateInformationRequest {
+    user_uuid: string;
+    organization?: string;
+    organization_description?: string;
+    logo?: string;
+}
+
+export interface UpdateInformationResponse
+{
+    status: number;
+    data: {
+        user_uuid: string;
+        logo: string;
+        organization: string;
+        organization_description: string;
+    }
+}

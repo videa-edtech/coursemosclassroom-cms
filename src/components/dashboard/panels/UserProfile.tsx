@@ -1,4 +1,4 @@
-// src/components/dashboard/panels/UserProfile.tsx
+// src/components/dashboard/panels/UserProfile.tsx - Phiên bản đơn giản
 'use client';
 
 import { FlatUser } from '@/services/flat/types';
@@ -15,14 +15,23 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
         try {
             await navigator.clipboard.writeText(text);
             setCopiedField(field);
-
-            // Reset copied state after 2 seconds
-            setTimeout(() => {
-                setCopiedField(null);
-            }, 2000);
+            setTimeout(() => setCopiedField(null), 2000);
         } catch (err) {
             console.error('Failed to copy text: ', err);
         }
+    };
+
+    // Hàm ẩn phần giữa của chuỗi
+    const maskSensitiveData = (str: string | undefined, visibleChars: number = 4) => {
+        if (!str) return 'Not available';
+
+        if (str.length <= visibleChars * 2) {
+            return str;
+        }
+
+        const start = str.substring(0, visibleChars);
+        const end = str.substring(str.length - visibleChars);
+        return `${start}••••${end}`;
     };
 
     const CopyIcon = ({ isCopied }: { isCopied: boolean }) => (
@@ -31,7 +40,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
         >
             {isCopied ? (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -49,7 +57,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                 <div className="space-y-4">
                     <div className="flex items-center space-x-4">
                         <img
-                            src={user.avatar}
+                            src={JSON.parse(localStorage.getItem('flatUser') || '{}').avatar ||
+                                JSON.parse(localStorage.getItem('flatUser') || '{}').avatar_url ||
+                                ''}
                             alt={user.name}
                             className="w-20 h-20 rounded-full"
                         />
@@ -62,12 +72,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                     <div className="bg-gray-50 p-4 rounded-lg">
                         <h4 className="font-semibold mb-2">Account Information</h4>
                         <div className="space-y-2 text-sm">
+                            {/* User UUID */}
                             <div className="flex justify-between items-center">
                                 <span>User UUID:</span>
                                 <div className="flex items-center gap-2">
-                                    <span className="font-mono text-xs">{user.userUUID}</span>
+                                    <span className="font-mono text-xs">
+                                        {maskSensitiveData(user.userUUID)}
+                                    </span>
                                     <button
-                                        onClick={() => handleCopy(user.userUUID, 'uuid')}
+                                        onClick={() => handleCopy(user.userUUID || '', 'uuid')}
                                         className="p-1 rounded hover:bg-gray-200 transition-colors"
                                         title="Copy User UUID"
                                     >
@@ -75,12 +88,16 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Client Key */}
                             <div className="flex justify-between items-center">
                                 <span>Client Key:</span>
                                 <div className="flex items-center gap-2">
-                                    <span className="font-mono text-xs">{user.clientKey}</span>
+                                    <span className="font-mono text-xs">
+                                        {maskSensitiveData(user.clientKey)}
+                                    </span>
                                     <button
-                                        onClick={() => handleCopy(user.clientKey, 'clientKey')}
+                                        onClick={() => handleCopy(user.clientKey || '', 'clientKey')}
                                         className="p-1 rounded hover:bg-gray-200 transition-colors"
                                         title="Copy Client Key"
                                     >
@@ -89,9 +106,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Note */}
+                        {/*<div className="mt-3 pt-3 border-t border-gray-200">*/}
+                        {/*    <p className="text-xs text-gray-500">*/}
+                        {/*        Sensitive data is masked for security. Click copy icon to copy full value.*/}
+                        {/*    </p>*/}
+                        {/*</div>*/}
                     </div>
 
-                    {/* Success message when copied */}
                     {copiedField && (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                             <p className="text-green-700 text-sm flex items-center gap-2">
@@ -103,32 +126,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user }) => {
                         </div>
                     )}
                 </div>
-
-                {/*<div className="space-y-4">*/}
-                {/*    <div className="bg-blue-50 p-4 rounded-lg">*/}
-                {/*        <h4 className="font-semibold mb-2">Account Status</h4>*/}
-                {/*        <div className="space-y-2">*/}
-                {/*            <div className="flex justify-between">*/}
-                {/*                <span>Phone Verified:</span>*/}
-                {/*                <span className={user.hasPhone ? "text-green-600" : "text-red-600"}>*/}
-                {/*                    {user.hasPhone ? "Yes" : "No"}*/}
-                {/*                </span>*/}
-                {/*            </div>*/}
-                {/*            <div className="flex justify-between">*/}
-                {/*                <span>Password Set:</span>*/}
-                {/*                <span className={user.hasPassword ? "text-green-600" : "text-red-600"}>*/}
-                {/*                    {user.hasPassword ? "Yes" : "No"}*/}
-                {/*                </span>*/}
-                {/*            </div>*/}
-                {/*            <div className="flex justify-between">*/}
-                {/*                <span>Anonymous Account:</span>*/}
-                {/*                <span className={user.isAnonymous ? "text-yellow-600" : "text-green-600"}>*/}
-                {/*                    {user.isAnonymous ? "Yes" : "No"}*/}
-                {/*                </span>*/}
-                {/*            </div>*/}
-                {/*        </div>*/}
-                {/*    </div>*/}
-                {/*</div>*/}
             </div>
         </div>
     );

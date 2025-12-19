@@ -127,12 +127,12 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                 {/* Modal Header */}
                 <div className="flex justify-between items-center p-6 border-b">
                     <div>
-                        <h3 className="text-xl font-bold text-gray-800">{room.title}</h3>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                        <h3 className="text-xl font-bold text-gray-800">{room.title} <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
                                 {room.roomStatus}
-                            </span>
-                            <span>Room ID: {room.roomUUID.substring(0, 8)}...</span>
+                            </span></h3>
+                        <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+
+                            <span>Room ID: {room.roomUUID}</span>
                         </div>
                     </div>
                     <button
@@ -388,9 +388,9 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                                                 <thead className="bg-gray-50">
                                                 <tr>
                                                     <th className="p-3 text-left text-gray-600">User</th>
-                                                    <th className="p-3 text-left text-gray-600">User ID</th>
+                                                    {/*<th className="p-3 text-left text-gray-600">User ID</th>*/}
                                                     <th className="p-3 text-left text-gray-600">Role</th>
-                                                    <th className="p-3 text-left text-gray-600">Status</th>
+                                                    {/*<th className="p-3 text-left text-gray-600">Status</th>*/}
                                                 </tr>
                                                 </thead>
                                                 <tbody className="divide-y">
@@ -401,9 +401,9 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                                                                 {participant.user_name || 'Unknown'}
                                                             </div>
                                                         </td>
-                                                        <td className="p-3 text-gray-500 text-xs">
-                                                            {participant.user_uuid?.substring(0, 8)}...
-                                                        </td>
+                                                        {/*<td className="p-3 text-gray-500 text-xs">*/}
+                                                        {/*    {participant.user_uuid?.substring(0, 8)}...*/}
+                                                        {/*</td>*/}
                                                         <td className="p-3">
                                                                 <span className={`px-2 py-1 rounded-full text-xs ${participant.rtc_uid === 1
                                                                     ? 'bg-purple-100 text-purple-800'
@@ -412,14 +412,14 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                                                                     {participant.rtc_uid === 1 ? 'Host' : 'Participant'}
                                                                 </span>
                                                         </td>
-                                                        <td className="p-3">
-                                                                <span className={`px-2 py-1 rounded-full text-xs ${participant.is_delete === 0
-                                                                    ? 'bg-green-100 text-green-800'
-                                                                    : 'bg-red-100 text-red-800'
-                                                                }`}>
-                                                                    {participant.is_delete === 0 ? 'Active' : 'Removed'}
-                                                                </span>
-                                                        </td>
+                                                        {/*<td className="p-3">*/}
+                                                        {/*        <span className={`px-2 py-1 rounded-full text-xs ${participant.is_delete === 0*/}
+                                                        {/*            ? 'bg-green-100 text-green-800'*/}
+                                                        {/*            : 'bg-red-100 text-red-800'*/}
+                                                        {/*        }`}>*/}
+                                                        {/*            {participant.is_delete === 0 ? 'Active' : 'Removed'}*/}
+                                                        {/*        </span>*/}
+                                                        {/*</td>*/}
                                                     </tr>
                                                 ))}
                                                 </tbody>
@@ -433,10 +433,10 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                 </div>
 
                 {/* Modal Footer */}
-                <div className="p-6 border-t flex justify-between items-center">
-                    <div className="text-sm text-gray-500">
-                        Room UUID: {room.roomUUID}
-                    </div>
+                <div className="p-6 border-t flex justify-end items-center">
+                    {/*<div className="text-sm text-gray-500">*/}
+                    {/*    Room UUID: {room.roomUUID}*/}
+                    {/*</div>*/}
                     <div className="flex space-x-3">
                         <button
                             onClick={onClose}
@@ -544,13 +544,20 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
             let totalParticipantsCount = 0;
             let totalActualMinutesCount = 0;
 
+            // Lọc chỉ các room có status là "Stopped"
+            const stoppedRooms = data.rooms.filter(room =>
+                room.roomStatus === 'Stopped' || room.roomStatus === 'stopped'
+            );
+
+            console.log(`Found ${stoppedRooms.length} stopped rooms out of ${data.rooms.length} total rooms`);
+
             const allParticipants = await flatService.getTotalParticipantsForAllRoomUnderOrganization(
                 user.token,
                 { page: 1, limit: 100 }
             );
 
-            // Lấy thông tin chi tiết và participants cho từng room
-            for (const room of data.rooms.slice(0, 50)) {
+            // Lấy thông tin chi tiết và participants cho từng stopped room
+            for (const room of stoppedRooms.slice(0, 50)) {
                 try {
                     // Lấy thông tin room chi tiết
                     const roomInfo = await flatService.getRoomInfo(room.roomUUID, user.token);
@@ -582,10 +589,10 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
                     totalParticipantsCount = allParticipants.totalUsers;
                     totalActualMinutesCount += actualDuration;
 
-                    console.log(`Room "${roomInfo.roomInfo.title}": ${actualDuration} minutes, ${participantsData.totalParticipants} participants`);
+                    console.log(`Stopped Room "${roomInfo.roomInfo.title}": ${actualDuration} minutes, ${participantsData.totalParticipants} participants`);
 
                 } catch (roomError: any) {
-                    console.error(`Error fetching details for room ${room.roomUUID}:`, roomError);
+                    console.error(`Error fetching details for stopped room ${room.roomUUID}:`, roomError);
 
                     const estimatedDuration = room.duration || 0;
                     const estimatedParticipants = Math.max(1, Math.round(estimatedDuration / 10));
@@ -612,7 +619,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
             setTotalParticipants(totalParticipantsCount);
             setTotalActualMinutes(totalActualMinutesCount);
 
-            console.log(`Fetched details for ${roomsDetails.length} rooms`);
+            console.log(`Fetched details for ${roomsDetails.length} stopped rooms`);
             console.log(`Total participants: ${totalParticipantsCount}`);
             console.log(`Total actual minutes: ${totalActualMinutesCount}`);
 
@@ -626,8 +633,12 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
             }
             setDetailsError(errorMessage);
 
-            // Fallback
-            const fallbackRooms = data.rooms.map(room => ({
+            // Fallback: chỉ lấy stopped rooms
+            const stoppedRooms = data.rooms.filter(room =>
+                room.roomStatus === 'Stopped' || room.roomStatus === 'stopped'
+            );
+
+            const fallbackRooms = stoppedRooms.map(room => ({
                 roomUUID: room.roomUUID,
                 title: room.title,
                 beginTime: room.beginTime || Date.now(),
@@ -666,19 +677,19 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
         setShowModal(true);
     };
 
-    const getActiveRoomsCount = (): number => {
-        return roomsWithDetails.filter(room =>
-            room.roomStatus === 'Started' || room.roomStatus === 'Idle'
-        ).length;
-    };
-
     const getTotalRoomsCount = (): number => {
         return roomsWithDetails.length;
     };
 
-    const getCancelledRoomsCount = (): number => {
+    const getStoppedRoomsCount = (): number => {
         return roomsWithDetails.filter(room =>
-            room.roomStatus === 'Cancelled'
+            room.roomStatus === 'Stopped' || room.roomStatus === 'stopped'
+        ).length;
+    };
+
+    const getOtherStatusRoomsCount = (): number => {
+        return roomsWithDetails.filter(room =>
+            !(room.roomStatus === 'Stopped' || room.roomStatus === 'stopped')
         ).length;
     };
 
@@ -704,7 +715,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
         }
 
         return (
-            <div className="text-3xl font-bold text-purple-600">
+            <div className="text-2xl font-bold text-purple-600">
                 {totalParticipants}
             </div>
         );
@@ -773,8 +784,8 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
         );
     }
 
-    const totalActiveRooms = getTotalRoomsCount();
-    const cancelledRoomsCount = getCancelledRoomsCount();
+    const totalStoppedRooms = getTotalRoomsCount();
+    const otherStatusRoomsCount = getOtherStatusRoomsCount();
     const displayMinutes = totalActualMinutes;
     const totalDurationMinutes = totalActualMinutes;
 
@@ -782,6 +793,25 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
         <>
             <div>
                 <h2 className="text-2xl font-bold mb-6">Analytics Dashboard</h2>
+
+                {/* Info Banner về chỉ hiển thị stopped rooms */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <div className="ml-3 flex-1">
+                            <p className="text-sm text-blue-800">
+                                <strong>Note:</strong> Only showing rooms with status "Stopped" (completed sessions)
+                            </p>
+                            <p className="text-xs text-blue-600 mt-1">
+                                This ensures accurate analytics data based on actual session duration and participant activity.
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Error Banners */}
                 {error && (
@@ -842,47 +872,48 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
 
                 <div className="space-y-6">
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {/* Rooms Created */}
-                        <div className="bg-[#fcfcfa] border rounded-lg p-4 text-center shadow-sm">
-                            <div className="text-3xl font-bold text-blue-600">
-                                {totalActiveRooms}
-                            </div>
-                            <div className="text-sm text-gray-600">Total Rooms</div>
-                            <div className="text-xs text-gray-400 mt-1">
-                                {activeTab === 'month' ? 'This month' : 'All time'}
-                                {cancelledRoomsCount > 0 && (
-                                    <div className="text-red-500">
-                                        {cancelledRoomsCount} cancelled
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Total Participants */}
-                        <div className="bg-[#fcfcfa] border rounded-lg p-4 text-center shadow-sm">
-                            {getParticipantsDisplay()}
-                            <div className="text-sm text-gray-600">Total Participants</div>
-                            <div className="text-xs text-gray-400 mt-1">
-                                {detailsError ? 'Estimated' : 'Actual count'}
-                            </div>
-                        </div>
-
-                        {/* Total Usage Time */}
-                        <div className="bg-[#fcfcfa] border rounded-lg p-4 text-center shadow-sm">
-                            {getUsageTimeDisplay()}
-                            <div className="text-sm text-gray-600">Total Usage Time</div>
-                            <div className="text-xs text-gray-400 mt-1">
-                                {activeTab === 'month' ? 'This month' : 'All time'}
-                                {detailsError && <div className="text-yellow-500">Estimated</div>}
-                            </div>
-                        </div>
-                    </div>
+                    {/*<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">*/}
+                    {/*    /!* Stopped Rooms *!/*/}
+                    {/*    <div className="bg-[#fcfcfa] border rounded-lg p-4 text-center shadow-sm">*/}
+                    {/*        <div className="text-3xl font-bold text-blue-600">*/}
+                    {/*            {totalStoppedRooms}*/}
+                    {/*        </div>*/}
+                    {/*        <div className="text-sm text-gray-600">Completed Rooms</div>*/}
+                    {/*        <div className="text-xs text-gray-400 mt-1">*/}
+                    {/*            {activeTab === 'month' ? 'This month' : 'All time'}*/}
+                    {/*            {otherStatusRoomsCount > 0 && (*/}
+                    {/*                <div className="text-amber-500 mt-1">*/}
+                    {/*                    +{otherStatusRoomsCount} other status*/}
+                    {/*                </div>*/}
+                    {/*            )}*/}
+                    {/*        </div>*/}
+                    {/*    </div>*/}
+                    
+                    {/*    /!* Total Participants *!/*/}
+                    {/*    <div className="bg-[#fcfcfa] border rounded-lg p-4 text-center shadow-sm">*/}
+                    {/*        {getParticipantsDisplay()}*/}
+                    {/*        <div className="text-sm text-gray-600">Total Participants</div>*/}
+                    {/*        <div className="text-xs text-gray-400 mt-1">*/}
+                    {/*            In completed rooms only*/}
+                    {/*            {detailsError && <div className="text-yellow-500 mt-1">Estimated</div>}*/}
+                    {/*        </div>*/}
+                    {/*    </div>*/}
+                    
+                    {/*    /!* Total Usage Time *!/*/}
+                    {/*    <div className="bg-[#fcfcfa] border rounded-lg p-4 text-center shadow-sm">*/}
+                    {/*        {getUsageTimeDisplay()}*/}
+                    {/*        <div className="text-sm text-gray-600">Total Session Time</div>*/}
+                    {/*        <div className="text-xs text-gray-400 mt-1">*/}
+                    {/*            {activeTab === 'month' ? 'This month' : 'All time'}*/}
+                    {/*            {detailsError && <div className="text-yellow-500 mt-1">Estimated</div>}*/}
+                    {/*        </div>*/}
+                    {/*    </div>*/}
+                    {/*</div>*/}
 
                     {/* Detailed Statistics */}
                     <div className="bg-[#fcfcfa] border rounded-lg p-6 shadow-sm">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold">Usage Statistics</h3>
+                            <h3 className="text-lg font-semibold">Completed Sessions Analytics</h3>
                             {lastUpdated && (
                                 <span className="text-xs text-gray-500">
                                     Last updated: {lastUpdated.toLocaleTimeString()}
@@ -892,40 +923,48 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
 
                         {roomsWithDetails.length > 0 ? (
                             <div className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                                     <div className="p-3 bg-blue-50 rounded-lg">
                                         <div className="text-2xl font-bold text-blue-600">
-                                            {totalActiveRooms}
+                                            {totalStoppedRooms}
                                         </div>
-                                        <div className="text-sm text-gray-600">Total Rooms</div>
-                                        {cancelledRoomsCount > 0 && (
-                                            <div className="text-xs text-red-500">
-                                                +{cancelledRoomsCount} cancelled
+                                        <div className="text-sm text-gray-600">Completed Rooms</div>
+                                        {otherStatusRoomsCount > 0 && (
+                                            <div className="text-xs text-amber-500">
+                                                +{otherStatusRoomsCount} other status rooms excluded
                                             </div>
                                         )}
+                                    </div>
+                                    <div className="p-3 bg-blue-50 rounded-lg">
+                                        <div className="text-2xl font-bold text-blue-600">
+                                            {getParticipantsDisplay()}
+                                        </div>
+                                        <div className="text-sm text-gray-600">Total Participants</div>
+                                        
+
                                     </div>
                                     <div className="p-3 bg-green-50 rounded-lg">
                                         <div className="text-2xl font-bold text-green-600">
                                             {formatTime(totalActualMinutes)}
                                         </div>
-                                        <div className="text-sm text-gray-600">Total Duration</div>
+                                        <div className="text-sm text-gray-600">Total Session Time</div>
                                         {detailsError && (
                                             <div className="text-xs text-yellow-500">Estimated</div>
                                         )}
                                     </div>
                                     <div className="p-3 bg-purple-50 rounded-lg">
                                         <div className="text-2xl font-bold text-purple-600">
-                                            {totalActiveRooms > 0 ? Math.round(totalDurationMinutes / totalActiveRooms) : 0}m
+                                            {totalStoppedRooms > 0 ? Math.round(totalDurationMinutes / totalStoppedRooms) : 0}m
                                         </div>
-                                        <div className="text-sm text-gray-600">Avg per Room</div>
+                                        <div className="text-sm text-gray-600">Avg Session Duration</div>
                                     </div>
                                 </div>
 
                                 <div className="border-t pt-4">
                                     <div className="flex justify-between items-center mb-3">
-                                        <h4 className="font-medium">Recent Rooms</h4>
+                                        <h4 className="font-medium">Recent Completed Sessions</h4>
                                         <span className="text-xs text-gray-500">
-                                            {totalParticipants} total participants • Click any room for details
+                                            {totalParticipants} total participants • Click any session for details
                                         </span>
                                     </div>
                                     <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -943,7 +982,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
                                                         </span>
                                                     </div>
                                                     <div className="text-xs text-gray-500">
-                                                        {new Date(room.beginTime).toLocaleDateString()} • {room.roomStatus}
+                                                        {new Date(room.beginTime).toLocaleDateString()} • Completed
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
@@ -962,17 +1001,22 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
                         ) : (
                             <div className="text-center py-8 text-gray-500">
                                 <div className="text-4xl mb-4">📊</div>
-                                <p className="text-lg mb-2">No analytics data available</p>
+                                <p className="text-lg mb-2">No completed sessions found</p>
                                 <p className="text-sm">
                                     {error
                                         ? 'Unable to load data from the server.'
-                                        : 'Start creating rooms to see your usage statistics.'
+                                        : 'No rooms with "Stopped" status found in the selected time range.'
                                     }
                                 </p>
                                 {!error && (
-                                    <p className="text-xs mt-2 text-gray-400">
-                                        Switch between "Current Month" and "All Time" tabs to view different time ranges.
-                                    </p>
+                                    <>
+                                        <p className="text-xs mt-2 text-gray-400">
+                                            Only completed rooms (status: "Stopped") are shown in analytics.
+                                        </p>
+                                        <p className="text-xs mt-1 text-gray-400">
+                                            Switch between "Current Month" and "All Time" tabs to view different time ranges.
+                                        </p>
+                                    </>
                                 )}
                             </div>
                         )}
@@ -983,6 +1027,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ user }) => {
                         <div className="text-sm text-gray-500">
                             {error && 'Using fallback data - some statistics may be incomplete'}
                             {detailsError && !error && 'Using estimated room details and participants data'}
+                            {!error && !detailsError && `Showing ${totalStoppedRooms} completed sessions only`}
                         </div>
                         <div className="flex space-x-2">
                             <button

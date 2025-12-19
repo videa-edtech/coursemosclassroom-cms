@@ -12,7 +12,9 @@ import {
     OrganizationUsersSummary,
     UserInOutRecord,
     UserInOutResponse,
-    UserInOutSummary
+    UserInOutSummary,
+    UpdateInformationResponse,
+    UpdateInformationRequest
 } from './types';
 import {FlatRoomResponse} from "@/services/flat/types";
 
@@ -61,7 +63,9 @@ export class FlatService {
     async login(credentials: FlatLoginRequest): Promise<FlatUser> {
         return this.auth.login(credentials);
     }
-
+    async updateInformation(user_uuid: string, updateData: UpdateInformationRequest, token: string) {
+        return this.auth.updateInformation(user_uuid, updateData, token);
+    }
     /**
      * Lấy danh sách phòng của user
      */

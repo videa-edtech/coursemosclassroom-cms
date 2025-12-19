@@ -29,3 +29,9 @@ export interface OrganizationUsersSummary {
     page: number;
     limit: number;
 }
+export interface OrganizationProfileUpdate {
+    name?: string;
+    avatar_url?: string;
+    organization?: string;
+    organization_description?: string;
+}
