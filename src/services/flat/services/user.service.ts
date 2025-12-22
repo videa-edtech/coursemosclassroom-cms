@@ -23,7 +23,7 @@ export class UserService {
     ): Promise<OrganizationUsersSummary> {
         try {
             console.log('Fetching organization users');
-            console.log('Using baseURL:', this.baseURL);
+            // console.log('Using baseURL:', this.baseURL);
 
             const page = options?.page || 1;
             const limit = options?.limit || 10;

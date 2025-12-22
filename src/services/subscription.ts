@@ -43,7 +43,9 @@ export class SubscriptionService {
     static async updateUsage(
         subscriptionId: string,
         duration: number,
-        participantsCount: number = 0
+        participantsCount: number = 0,
+        roomsCount: number = 1,
+
     ): Promise<void> {
         try {
             const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/dashboard-api/subscriptions/usage`, {
@@ -55,6 +57,7 @@ export class SubscriptionService {
                     subscriptionId,
                     duration,
                     participantsCount,
+                    roomsCount
                 }),
             });
 

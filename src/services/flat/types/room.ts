@@ -167,3 +167,49 @@ export interface UserInOutSummary {
     roomUUID: string;
     roomTitle: string;
 }
+
+
+export interface BillItem {
+    room_uuid: string;
+    created_at: string;
+    updated_at: string;
+    room_title: string;
+    begin_time: string;
+    end_time: string;
+    room_type: string;
+    room_status: string;
+    user_uuid: string;
+    user_name: string;
+    duration_minutes: string;
+}
+
+export interface BillResponse {
+    status: number;
+    data: {
+        total: number;
+        list: BillItem[];
+        page: number;
+        limit: number;
+    };
+}
+
+export interface BillOptions {
+    start_date?: string; // format: YYYY-MM-DD
+    end_date?: string; // format: YYYY-MM-DD
+    organization_uuid?: string;
+    email?: string;
+    page?: number;
+    limit?: number;
+}
+
+export interface BillSummary {
+    total: number;
+    list: BillItem[];
+    page: number;
+    limit: number;
+    totalDurationMinutes: number;
+    averageDurationMinutes: number;
+    totalRooms: number;
+    uniqueUsers: number;
+    byRoomType: Record<string, number>;
+}

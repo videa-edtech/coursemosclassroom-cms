@@ -14,7 +14,11 @@ import {
     RoomItem,
     UserInOutRecord,
     UserInOutResponse,
-    UserInOutSummary
+    UserInOutSummary,
+    BillItem,
+    BillResponse,
+    BillOptions,
+    BillSummary
 } from '../types';
 import { generateClientKey } from '../utils/crypto';
 import {RoomParticipant} from "@/services/flat/types";
@@ -68,7 +72,7 @@ export class RoomService {
     async stopRoom(roomUUID: string, token: string): Promise<StopRoomResponse['data']> {
         try {
             console.log('Stopping room:', roomUUID);
-            console.log('Using baseURL:', this.baseURL);
+            // console.log('Using baseURL:', this.baseURL);
 
             const requestData: StopRoomRequest = {
                 roomUUID: roomUUID,
@@ -190,7 +194,7 @@ export class RoomService {
     async getRoomInfo(roomUUID: string, token: string): Promise<RoomInfoResponse['data']> {
         try {
             console.log('Fetching room info for roomUUID:', roomUUID);
-            console.log('Using baseURL:', this.baseURL);
+            // console.log('Using baseURL:', this.baseURL);
 
             const requestData: RoomInfoRequest = {
                 roomUUID: roomUUID,
@@ -206,7 +210,6 @@ export class RoomService {
                     }
                 }
             );
-
             if (response.data.status !== 0) {
                 throw new Error('Failed to fetch room info');
             }
@@ -503,7 +506,7 @@ export class RoomService {
     }): Promise<UserInOutSummary> {
         try {
             console.log('Fetching user in-out records for roomUUID:', roomUUID);
-            console.log('Using baseURL:', this.baseURL);
+            // console.log('Using baseURL:', this.baseURL);
 
             // Lưu ý: API này dùng POST method với body param
             const response = await axios.post<UserInOutResponse>(
@@ -554,7 +557,7 @@ export class RoomService {
     }): Promise<UserInOutSummary> {
         try {
             console.log('Fetching user in-out records for roomUUID:', roomUUID);
-            console.log('Using baseURL:', this.baseURL);
+            // console.log('Using baseURL:', this.baseURL);
 
             // Lưu ý: API này dùng POST method với body param
             const response = await axios.post<UserInOutResponse>(
@@ -854,4 +857,207 @@ export class RoomService {
             throw new Error(`Failed to generate user in-out analysis: ${error.message}`);
         }
     }
+
+
+    /*Lấy thông tin bill*/
+
+    async getBillsByDate(token: string, options: BillOptions = {}): Promise<BillSummary> {
+        try {
+            console.log('Fetching bills by date with options:', options);
+            // console.log('Using baseURL:', this.baseURL);
+
+            const {
+                start_date,
+                end_date,
+                organization_uuid,
+                email,
+                page = 1,
+                limit = 10
+            } = options;
+
+            // Xây dựng query parameters
+            const params: Record<string, any> = {
+                page: page.toString(),
+                limit: limit.toString()
+            };
+
+            if (start_date) {
+                params.start_date = start_date;
+            }
+
+            if (end_date) {
+                params.end_date = end_date;
+            }
+
+            if (organization_uuid) {
+                params.organization_uuid = organization_uuid;
+            }
+
+            if (email) {
+                params.email = email;
+            }
+
+            const response = await axios.get<BillResponse>(
+                `${this.baseURL}/v1/user/organization/bill`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    params: params
+                }
+            );
+
+            if (response.data.status !== 0) {
+                throw new Error('Failed to fetch bills');
+            }
+
+            console.log('Bills fetched successfully:', {
+                total: response.data.data.total,
+                currentPage: response.data.data.page,
+                itemsCount: response.data.data.list.length
+            });
+
+            // Tính toán summary
+            const billData = response.data.data;
+            const summary = this.calculateBillSummary(billData);
+
+            return summary;
+
+        } catch (error: any) {
+            console.error('Error fetching bills:', error);
+            console.error('Error response:', error.response?.data);
+            throw new Error(`Failed to fetch bills: ${error.response?.data?.message || error.message}`);
+        }
+    }
+
+    private calculateBillSummary(billData: BillResponse['data']): BillSummary {
+        const { total, list, page, limit } = billData;
+
+        // Tính tổng duration minutes
+        const totalDurationMinutes = list.reduce((sum, item) => {
+            return sum + parseFloat(item.duration_minutes);
+        }, 0);
+
+        // Tính average duration
+        const averageDurationMinutes = list.length > 0
+            ? Number((totalDurationMinutes / list.length).toFixed(2))
+            : 0;
+
+        // Đếm số user unique
+        const uniqueUserUUIDs = new Set(list.map(item => item.user_uuid));
+        const uniqueUsers = uniqueUserUUIDs.size;
+
+        // Phân loại theo room type
+        const byRoomType: Record<string, number> = {};
+        list.forEach(item => {
+            byRoomType[item.room_type] = (byRoomType[item.room_type] || 0) + 1;
+        });
+
+        return {
+            total,
+            list,
+            page,
+            limit,
+            totalDurationMinutes: Number(totalDurationMinutes.toFixed(2)),
+            averageDurationMinutes,
+            totalRooms: list.length,
+            uniqueUsers,
+            byRoomType
+        };
+    }
+
+    /**
+     * Lấy bill summary cho tháng hiện tại (tiện ích)
+     */
+    async getCurrentMonthBillSummary(token: string, options?: Omit<BillOptions, 'start_date' | 'end_date'>): Promise<BillSummary> {
+        const now = new Date();
+        return this.getMonthlyBillSummary(token, now.getFullYear(), now.getMonth() + 1, options);
+    }
+
+
+    /**
+     * Lấy bill summary theo tháng (tiện ích)
+     */
+    async getMonthlyBillSummary(token: string, year: number, month: number, options?: Omit<BillOptions, 'start_date' | 'end_date'>): Promise<BillSummary> {
+        try {
+            // Tạo ngày đầu tháng
+            const startDate = new Date(year, month - 1, 1);
+            const endDate = new Date(year, month, 0); // Ngày cuối tháng
+
+            // Format dates to YYYY-MM-DD
+            const start_date = startDate.toISOString().split('T')[0];
+            const end_date = endDate.toISOString().split('T')[0];
+
+            console.log(`Getting monthly bill summary for ${year}-${month.toString().padStart(2, '0')}: ${start_date} to ${end_date}`);
+
+            return this.getAllBillsByDate(token, {
+                ...options,
+                start_date,
+                end_date
+            });
+
+        } catch (error: any) {
+            console.error('Error getting monthly bill summary:', error);
+            throw new Error(`Failed to get monthly bill summary: ${error.message}`);
+        }
+    }
+
+    /**
+     * Lấy tất cả bill (tự động lấy tất cả trang)
+     */
+    async getAllBillsByDate(token: string, options: BillOptions = {}): Promise<BillSummary> {
+        try {
+            console.log('Fetching all bills with options:', options);
+
+            const allBills: BillItem[] = [];
+            let currentPage = 1;
+            const limit = options.limit || 50;
+            let hasMore = true;
+            let total = 0;
+
+            while (hasMore) {
+                console.log(`Fetching bills page ${currentPage}`);
+
+                const response = await this.getBillsByDate(token, {
+                    ...options,
+                    page: currentPage,
+                    limit: limit
+                });
+
+                // Lưu total từ page đầu tiên
+                if (currentPage === 1) {
+                    total = response.total;
+                }
+
+                allBills.push(...response.list);
+
+                // Kiểm tra nếu đã lấy hết tất cả bill
+                if (allBills.length >= total || response.list.length < limit) {
+                    hasMore = false;
+                } else {
+                    currentPage++;
+                }
+            }
+
+            console.log(`Fetched all ${allBills.length} bills`);
+
+            // Tính toán summary cho toàn bộ dữ liệu
+            const billData = {
+                total: allBills.length,
+                list: allBills,
+                page: 1,
+                limit: allBills.length
+            };
+
+            return this.calculateBillSummary(billData);
+
+        } catch (error: any) {
+            console.error('Error fetching all bills:', error);
+            throw new Error(`Failed to fetch all bills: ${error.message}`);
+        }
+    }
+
+
 }
+

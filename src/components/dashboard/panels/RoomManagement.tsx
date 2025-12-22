@@ -8,6 +8,7 @@ import { RoomItem } from '@/services/flat/types';
 import { useAuth } from "@/contexts/AuthContext";
 import { SubscriptionService, SubscriptionCheck } from '@/services/subscription';
 import { generateClientKey } from '../../../../src/services/flat/utils/crypto';
+
 interface RoomManagementProps {
     user: FlatUser;
     customerId: any;
@@ -18,6 +19,41 @@ interface CreateRoomForm {
     beginTime: string;
     endTime: string;
     email: string;
+}
+
+// Thêm interface cho Bill Summary
+interface BillSummary {
+    total: number;
+    list: Array<{
+        room_uuid: string;
+        room_title: string;
+        begin_time: string;
+        end_time: string;
+        duration_minutes: string;
+        room_type: string;
+        room_status: string;
+        user_uuid: string;
+        user_name: string;
+    }>;
+    page: number;
+    limit: number;
+    totalDurationMinutes: number;
+    averageDurationMinutes: number;
+    totalRooms: number;
+    uniqueUsers: number;
+    byRoomType: Record<string, number>;
+}
+
+// Thêm interface cho Usage Summary
+interface UsageSummary {
+    totalMinutes: number;
+    totalRooms: number;
+    remainingMinutes: number;
+    remainingRooms: number;
+    maxMinutesPerMonth: number;
+    maxRoomsPerMonth: number;
+    maxDurationPerRoom: number;
+    billData?: BillSummary;
 }
 
 enum RoomStatus {
@@ -50,6 +86,13 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('all');
 
+    // Thêm state cho bill summary
+    const [billSummary, setBillSummary] = useState<BillSummary | null>(null);
+    const [isLoadingBill, setIsLoadingBill] = useState(false);
+
+    // Thêm state cho usage summary thực tế
+    const [realUsageSummary, setRealUsageSummary] = useState<UsageSummary | null>(null);
+
     // Subscription state
     const [subscriptionCheck, setSubscriptionCheck] = useState<SubscriptionCheck | null>(null);
     const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
@@ -65,6 +108,13 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
             fetchUserRooms();
         }
     }, [user.token, currentPage, subscriptionCheck]);
+
+    // Fetch bill summary thực tế
+    useEffect(() => {
+        if (subscriptionCheck?.hasActiveSubscription && user?.token) {
+            fetchRealUsageSummary();
+        }
+    }, [user.token, subscriptionCheck]);
 
     // Filter rooms
     useEffect(() => {
@@ -84,6 +134,65 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
             }));
         }
     }, [user.email]);
+
+    // Hàm lấy tổng số phút thực tế từ bill
+    const fetchRealUsageSummary = async () => {
+        if (!user?.token) return;
+
+        setIsLoadingBill(true);
+        setError('');
+        try {
+            // Lấy bill summary tháng hiện tại
+            const currentMonthSummary = await flatService.getCurrentMonthBillSummary(user.token);
+            setBillSummary(currentMonthSummary);
+
+            // Tính toán usage summary dựa trên subscription plan và bill thực tế
+            const maxMinutesPerMonth = subscriptionCheck?.plan?.maxMinutesPerMonth || 0;
+            const maxRoomsPerMonth = subscriptionCheck?.plan?.maxRoomsPerMonth || 0;
+            const maxDurationPerRoom = subscriptionCheck?.plan?.maxDuration || 0;
+
+            const totalMinutes = currentMonthSummary.totalDurationMinutes;
+            const totalRoomsCount = currentMonthSummary.totalRooms;
+
+            const realUsage: UsageSummary = {
+                totalMinutes,
+                totalRooms: totalRoomsCount,
+                remainingMinutes: Math.max(0, maxMinutesPerMonth - totalMinutes),
+                remainingRooms: Math.max(0, maxRoomsPerMonth - totalRoomsCount),
+                maxMinutesPerMonth,
+                maxRoomsPerMonth,
+                maxDurationPerRoom,
+                billData: currentMonthSummary
+            };
+
+            setRealUsageSummary(realUsage);
+            // Update subscription usage
+            await SubscriptionService.updateUsage(
+                subscriptionCheck?.subscription?.id.toString(),
+                totalMinutes,
+                0,
+                totalRoomsCount
+            );
+            console.log('Real usage summary:', realUsage);
+
+        } catch (error: any) {
+            console.error('Error fetching real usage summary:', error);
+            // Nếu không lấy được bill, dùng subscription usage
+            if (subscriptionCheck?.usage) {
+                setRealUsageSummary({
+                    totalMinutes: subscriptionCheck.usage.totalMinutes || 0,
+                    totalRooms: subscriptionCheck.usage.roomsCreated || 0,
+                    remainingMinutes: subscriptionCheck.usage.remainingMinutes || 0,
+                    remainingRooms: subscriptionCheck.usage.remainingRooms || 0,
+                    maxMinutesPerMonth: subscriptionCheck.usage.maxMinutesPerMonth || 0,
+                    maxRoomsPerMonth: subscriptionCheck.usage.maxRoomsPerMonth || 0,
+                    maxDurationPerRoom: subscriptionCheck.usage.maxDurationPerRoom || 0
+                });
+            }
+        } finally {
+            setIsLoadingBill(false);
+        }
+    };
 
     const checkSubscription = async () => {
         if (!customerId) return;
@@ -124,6 +233,30 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
         }
     };
 
+    // Hàm refresh toàn bộ dữ liệu
+    const handleRefreshAll = async () => {
+        setError('');
+        setSuccessMessage('');
+
+        try {
+            // Refresh subscription status
+            await checkSubscription();
+
+            // Chỉ refresh rooms và usage nếu có subscription active
+            if (subscriptionCheck?.hasActiveSubscription) {
+                // Refresh rooms và usage summary song song
+                await Promise.all([
+                    fetchUserRooms(),
+                    fetchRealUsageSummary()
+                ]);
+                // setSuccessMessage('Data refreshed successfully!');
+            }
+        } catch (error: any) {
+            console.error('Error refreshing data:', error);
+            setError('Failed to refresh data');
+        }
+    };
+
     const handleStopRoom = async (roomUUID: string, roomTitle: string) => {
         if (!user?.token) {
             setError('User information not found');
@@ -142,6 +275,8 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
             await flatService.stopRoom(roomUUID, user.token);
             setSuccessMessage(`Meeting "${roomTitle}" has been stopped successfully!`);
             await fetchUserRooms();
+            // Refresh bill summary sau khi stop room
+            await fetchRealUsageSummary();
         } catch (error: any) {
             console.error('Error stopping room:', error);
             setError(`Failed to stop meeting "${roomTitle}": ${error.message}`);
@@ -198,17 +333,39 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
             setError('End time must be after start time');
             return;
         }
-        const maxDuration = subscriptionCheck.plan?.maxDuration || 0;
-        if (duration > maxDuration) {
-            setError(`Room duration cannot exceed ${subscriptionCheck.plan?.maxDuration} minutes according to your plan`);
-            return;
-        }
 
-        // Check monthly minutes quota
-        const remainingMinutes = subscriptionCheck.usage?.remainingMinutes || 0;
-        if (duration > remainingMinutes) {
-            setError(`Room duration (${duration} minutes) exceeds your remaining monthly quota (${remainingMinutes} minutes)`);
-            return;
+        // Kiểm tra với usage thực tế
+        if (realUsageSummary) {
+            if (duration > realUsageSummary.maxDurationPerRoom) {
+                setError(`Room duration cannot exceed ${realUsageSummary.maxDurationPerRoom} minutes according to your plan`);
+                return;
+            }
+
+            // Check monthly minutes quota thực tế từ bill
+            if (duration > realUsageSummary.remainingMinutes) {
+                setError(`Room duration (${duration} minutes) exceeds your remaining monthly quota (${realUsageSummary.remainingMinutes} minutes)`);
+                return;
+            }
+
+            // Check monthly rooms quota thực tế từ bill
+            if (realUsageSummary.remainingRooms <= 0) {
+                setError(`You have reached your monthly rooms limit (${realUsageSummary.maxRoomsPerMonth} rooms)`);
+                return;
+            }
+        } else {
+            // Fallback dùng subscription check cũ
+            const maxDuration = subscriptionCheck.plan?.maxDuration || 0;
+            if (duration > maxDuration) {
+                setError(`Room duration cannot exceed ${subscriptionCheck.plan?.maxDuration} minutes according to your plan`);
+                return;
+            }
+
+            // Check monthly minutes quota
+            const remainingMinutes = subscriptionCheck.usage?.remainingMinutes || 0;
+            if (duration > remainingMinutes) {
+                setError(`Room duration (${duration} minutes) exceeds your remaining monthly quota (${remainingMinutes} minutes)`);
+                return;
+            }
         }
 
         if (endTime - beginTime > 24 * 60 * 60 * 1000) {
@@ -261,12 +418,6 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                     }),
                 });
 
-                // Update subscription usage
-                await SubscriptionService.updateUsage(
-                    subscriptionCheck.subscription!.id.toString(),
-                    duration
-                );
-
                 setCreatedRoom(room.data);
                 setFormData({
                     title: '',
@@ -277,9 +428,10 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                 setShowCreateForm(false);
                 setSuccessMessage('Room created successfully!');
 
-                // Refresh subscription check and rooms
+                // Refresh subscription check, rooms, và bill summary
                 await checkSubscription();
                 await fetchUserRooms();
+                await fetchRealUsageSummary();
             } else {
                 setError('Failed to create room: ' + JSON.stringify(room));
             }
@@ -348,6 +500,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                 // Mở URL với token
                 window.open(result.joinUrl, '_blank');
             } else {
+                console.error('Failed to get join token:', result);
             }
 
         } catch (error) {
@@ -390,8 +543,27 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
         return rooms.filter(room => getRoomStatus(room) === status).length;
     };
 
-    // Subscription usage display với thông tin minutes
+    // Cập nhật hàm renderSubscriptionInfo để hiển thị quota thực tế
     const renderSubscriptionInfo = () => {
+        // Nếu đang loading bill
+        if (isLoadingBill) {
+            return (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-800">
+                                Loading Usage Statistics...
+                            </h3>
+                            <p className="text-gray-600 mt-1">
+                                Fetching real usage data from bills...
+                            </p>
+                        </div>
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                    </div>
+                </div>
+            );
+        }
+
         if (!subscriptionCheck?.hasActiveSubscription) {
             return (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
@@ -415,27 +587,49 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
             );
         }
 
-        if (!subscriptionCheck.canCreateRoom) {
+        // Sử dụng realUsageSummary nếu có
+        const usage = realUsageSummary || {
+            totalMinutes: subscriptionCheck.usage?.totalMinutes || 0,
+            totalRooms: subscriptionCheck.usage?.roomsCreated || 0,
+            remainingMinutes: subscriptionCheck.usage?.remainingMinutes || 0,
+            remainingRooms: subscriptionCheck.usage?.remainingRooms || 0,
+            maxMinutesPerMonth: subscriptionCheck.usage?.maxMinutesPerMonth || 0,
+            maxRoomsPerMonth: subscriptionCheck.usage?.maxRoomsPerMonth || 0,
+            maxDurationPerRoom: subscriptionCheck.usage?.maxDurationPerRoom || 0
+        };
+
+        const hasExceededLimits =
+            (usage.maxRoomsPerMonth > 0 && usage.remainingRooms <= 0) ||
+            (usage.maxMinutesPerMonth > 0 && usage.remainingMinutes <= 0.5);
+
+        if (!subscriptionCheck.canCreateRoom || hasExceededLimits) {
             return (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between">
                         <div>
                             <h3 className="text-lg font-semibold text-red-800">
-                                Plan Limit Reached
+                                {hasExceededLimits ? 'Usage Limits Reached' : 'Plan Limit Reached'}
                             </h3>
                             <p className="text-red-700 mt-1">
-                                {subscriptionCheck.limitations?.join(', ')}
+                                {hasExceededLimits
+                                    ? 'You have reached your monthly usage limits.'
+                                    : subscriptionCheck.limitations?.join(', ')}
                             </p>
                             <div className="text-red-600 text-sm mt-2 space-y-1">
-                                <p>Rooms: {subscriptionCheck.usage?.roomsCreated} / {subscriptionCheck.usage?.maxRoomsPerMonth}</p>
-                                <p>Minutes: {subscriptionCheck.usage?.totalMinutes} / {subscriptionCheck.usage?.maxMinutesPerMonth}</p>
+                                <p>Rooms used: {usage.totalRooms} / {usage.maxRoomsPerMonth}</p>
+                                <p>Minutes used: {usage.totalMinutes.toFixed(2)} / {usage.maxMinutesPerMonth}</p>
+                                {billSummary && (
+                                    <p className="text-xs text-gray-600 mt-2">
+                                        Based on actual usage for current month
+                                    </p>
+                                )}
                             </div>
                         </div>
                         <button
                             onClick={() => window.open('/pricing', '_blank')}
                             className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
                         >
-                            Upgrade Plan
+                            {hasExceededLimits ? 'Upgrade Plan' : 'Manage Plan'}
                         </button>
                     </div>
                 </div>
@@ -446,24 +640,39 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                 <div className="flex items-center justify-between">
                     <div className="w-full">
-                        <h3 className="text-lg font-semibold text-green-800 mb-2">
-                            {subscriptionCheck.plan?.name} Plan
-                        </h3>
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-lg font-semibold text-green-800">
+                                {subscriptionCheck.plan?.name} Plan
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleRefreshAll}
+                                    disabled={isLoadingBill || isLoading}
+                                    className="text-xs text-green-600 hover:text-green-800 underline"
+                                >
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             {/* Rooms Progress Bar */}
                             <div>
                                 <div className="flex justify-between text-sm text-green-700 mb-1">
-                                    <span>Rooms Usage</span>
-                                    <span className="font-medium">{subscriptionCheck.usage?.remainingRooms} / {subscriptionCheck.usage?.maxRoomsPerMonth}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span>Rooms Usage</span>
+                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                                            {usage.remainingRooms} remaining
+                                        </span>
+                                    </div>
+                                    <span className="font-medium">{usage.totalRooms} / {usage.maxRoomsPerMonth}</span>
                                 </div>
-                                <div className="w-full bg-green-300 rounded-full h-2.5">
+                                <div className="w-full bg-green-200 rounded-full h-2.5">
                                     <div
-                                        className="bg-green-600 h-2.5 rounded-full"
+                                        className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
                                         style={{
                                             width: `${Math.min(
-                                                (((subscriptionCheck.usage?.maxRoomsPerMonth ?? 0) - (subscriptionCheck.usage?.remainingRooms ?? 0)) /
-                                                    (subscriptionCheck.usage?.maxRoomsPerMonth || 1)) * 100,
+                                                (usage.totalRooms / usage.maxRoomsPerMonth) * 100,
                                                 100
                                             )}%`
                                         }}
@@ -474,16 +683,20 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                             {/* Minutes Progress Bar */}
                             <div>
                                 <div className="flex justify-between text-sm text-green-700 mb-1">
-                                    <span>Minutes Usage</span>
-                                    <span className="font-medium">{subscriptionCheck.usage?.remainingMinutes} / {subscriptionCheck.usage?.maxMinutesPerMonth}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span>Minutes Usage</span>
+                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                                            {usage.remainingMinutes.toFixed(0)} remaining
+                                        </span>
+                                    </div>
+                                    <span className="font-medium">{usage.totalMinutes.toFixed(2)} / {usage.maxMinutesPerMonth}</span>
                                 </div>
-                                <div className="w-full bg-green-300 rounded-full h-2.5">
+                                <div className="w-full bg-green-200 rounded-full h-2.5">
                                     <div
-                                        className="bg-green-600 h-2.5 rounded-full"
+                                        className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
                                         style={{
                                             width: `${Math.min(
-                                                (((subscriptionCheck.usage?.maxMinutesPerMonth ?? 0) - (subscriptionCheck.usage?.remainingMinutes ?? 0)) /
-                                                    (subscriptionCheck.usage?.maxMinutesPerMonth || 1)) * 100,
+                                                (usage.totalMinutes / usage.maxMinutesPerMonth) * 100,
                                                 100
                                             )}%`
                                         }}
@@ -492,7 +705,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                             </div>
 
                             <p className="text-green-600 text-sm pt-2">
-                                <strong>Max duration per room:</strong> {subscriptionCheck.usage?.maxDurationPerRoom} minutes
+                                <strong>Max duration per room:</strong> {usage.maxDurationPerRoom} minutes
                             </p>
                         </div>
                     </div>
@@ -504,6 +717,58 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                         Manage Plan
                     </button>
                 </div>
+            </div>
+        );
+    };
+
+    // Cập nhật phần tạo room form để hiển thị quota thực tế
+    const renderQuotaInfoInForm = () => {
+        if (!realUsageSummary) return null;
+
+        const duration = formData.beginTime && formData.endTime
+            ? calculateDuration(formData.beginTime, formData.endTime)
+            : 0;
+
+        const isDurationExceeded = duration > realUsageSummary.maxDurationPerRoom;
+        const isMinutesExceeded = duration > realUsageSummary.remainingMinutes;
+        const isRoomsExceeded = realUsageSummary.remainingRooms <= 0;
+
+        return (
+            <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+                <p className="text-sm text-gray-600">
+                    <strong>Room Type:</strong> SmallClass (Fixed)
+                </p>
+                <p className="text-sm text-gray-600">
+                    <strong>Duration:</strong> {formData.beginTime && formData.endTime
+                    ? `${Math.round(duration)} minutes`
+                    : 'N/A'
+                }
+                </p>
+
+                {/*<div className="space-y-1 text-sm">*/}
+                {/*    <p className="font-medium text-gray-700">Plan Limits (Based on actual usage):</p>*/}
+
+                {/*    <div className={`flex justify-between ${isDurationExceeded ? 'text-red-600' : 'text-gray-600'}`}>*/}
+                {/*        <span>• Max duration per room:</span>*/}
+                {/*        <span>{realUsageSummary.maxDurationPerRoom} minutes</span>*/}
+                {/*    </div>*/}
+
+                {/*    <div className={`flex justify-between ${isMinutesExceeded ? 'text-red-600' : 'text-gray-600'}`}>*/}
+                {/*        <span>• Remaining minutes:</span>*/}
+                {/*        <span>{realUsageSummary.remainingMinutes.toFixed(0)} minutes</span>*/}
+                {/*    </div>*/}
+
+                {/*    <div className={`flex justify-between ${isRoomsExceeded ? 'text-red-600' : 'text-gray-600'}`}>*/}
+                {/*        <span>• Remaining rooms:</span>*/}
+                {/*        <span>{realUsageSummary.remainingRooms} rooms</span>*/}
+                {/*    </div>*/}
+
+                {/*    {billSummary && (*/}
+                {/*        <div className="text-xs text-gray-500 pt-1 border-t border-gray-300">*/}
+                {/*            <p>Current month: {billSummary.totalRooms} rooms, {billSummary.totalDurationMinutes.toFixed(2)} minutes used</p>*/}
+                {/*        </div>*/}
+                {/*    )}*/}
+                {/*</div>*/}
             </div>
         );
     };
@@ -531,7 +796,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
         <div>
             <h2 className="text-2xl font-bold mb-6">Room Management</h2>
 
-            {/* Subscription Info */}
+            {/* Subscription Info với quota thực tế */}
             {renderSubscriptionInfo()}
 
             {/* Success Message */}
@@ -549,32 +814,6 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
             )}
 
             <div className="space-y-6">
-                {/* Room Statistics */}
-                {/*<div className="grid grid-cols-1 md:grid-cols-5 gap-4">*/}
-                {/*    {tabs.map(tab => (*/}
-                {/*        <div*/}
-                {/*            key={tab.id}*/}
-                {/*            className={`p-4 rounded-lg text-center cursor-pointer transition-all ${*/}
-                {/*                activeTab === tab.id*/}
-                {/*                    ? 'bg-blue-100 border-2 border-blue-500'*/}
-                {/*                    : 'bg-gray-50 hover:bg-gray-100'*/}
-                {/*            }`}*/}
-                {/*            onClick={() => setActiveTab(tab.id)}*/}
-                {/*        >*/}
-                {/*            <div className={`text-2xl font-bold ${*/}
-                {/*                activeTab === tab.id ? 'text-blue-600' : 'text-gray-600'*/}
-                {/*            }`}>*/}
-                {/*                {tab.count}*/}
-                {/*            </div>*/}
-                {/*            <div className={`text-sm ${*/}
-                {/*                activeTab === tab.id ? 'text-blue-800' : 'text-gray-800'*/}
-                {/*            }`}>*/}
-                {/*                {tab.label}*/}
-                {/*            </div>*/}
-                {/*        </div>*/}
-                {/*    ))}*/}
-                {/*</div>*/}
-
                 {/* Create Room Button - Only show if user can create rooms */}
                 {!showCreateForm && subscriptionCheck?.canCreateRoom && (
                     <div className="bg-[#fcfcfa] border rounded-lg p-6 text-center">
@@ -585,7 +824,18 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                             + Create New Room
                         </button>
                         <div className="mt-2 text-sm text-gray-600">
-                            Remaining: {subscriptionCheck.usage?.remainingRooms} rooms, {subscriptionCheck.usage?.remainingMinutes} minutes
+                            {realUsageSummary ? (
+                                <>
+                                    Remaining: {realUsageSummary.remainingRooms} rooms, {realUsageSummary.remainingMinutes.toFixed(0)} minutes
+                                    {billSummary && (
+                                        <span className="text-xs text-gray-500 ml-2">
+                                            (Current month: {billSummary.totalRooms} rooms used)
+                                        </span>
+                                    )}
+                                </>
+                            ) : (
+                                <span>Loading real-time quota...</span>
+                            )}
                         </div>
                     </div>
                 )}
@@ -666,29 +916,8 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                                 </div>
                             </div>
 
-                            <div className="bg-gray-50 p-3 rounded-lg">
-                                <p className="text-sm text-gray-600">
-                                    <strong>Room Type:</strong> SmallClass (Fixed)
-                                </p>
-                                <p className="text-sm text-gray-600 mt-1">
-                                    <strong>Duration:</strong> {formData.beginTime && formData.endTime
-                                    ? `${Math.round(calculateDuration(formData.beginTime, formData.endTime))} minutes`
-                                    : 'N/A'
-                                }
-                                </p>
-                                <div className="text-sm text-gray-600 mt-1 space-y-1">
-                                    <p><strong>Plan Limits:</strong></p>
-                                    <p>- Max duration per room: {subscriptionCheck.usage?.maxDurationPerRoom} minutes</p>
-                                    <p>- Remaining minutes: {subscriptionCheck.usage?.remainingMinutes} minutes</p>
-                                    <p>- Remaining rooms: {subscriptionCheck.usage?.remainingRooms} rooms</p>
-                                </div>
-                            </div>
-
-                            {error && (
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                                    <p className="text-red-700">{error}</p>
-                                </div>
-                            )}
+                            {/* Quota Info với dữ liệu thực tế */}
+                            {renderQuotaInfoInForm()}
 
                             <div className="flex gap-3 pt-2">
                                 <button
@@ -742,7 +971,7 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                     </div>
 
                     {/* Tab Content */}
-                    <div className="p-6">
+                    <div className="p-6 h-[50vh] overflow-y-scroll">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-semibold">
                                 {activeTab === 'all' ? 'All Rooms' : `${activeTab} Rooms`}
@@ -752,18 +981,26 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                             </h3>
                             <div className="flex gap-2">
                                 <button
-                                    onClick={fetchUserRooms}
-                                    disabled={isLoading}
-                                    className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg disabled:opacity-50 transition-colors"
+                                    onClick={handleRefreshAll}
+                                    disabled={isLoading || isLoadingBill}
+                                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2"
                                 >
-                                    {isLoading ? 'Refreshing...' : 'Refresh'}
+                                    {(isLoading || isLoadingBill) ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                            Refreshing...
+                                        </>
+                                    ) : (
+                                        'Refresh All'
+                                    )}
                                 </button>
                             </div>
                         </div>
 
                         {isLoading ? (
                             <div className="text-center py-8">
-                                <p>Loading rooms...</p>
+                                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                                <p className="mt-2 text-gray-600">Loading rooms...</p>
                             </div>
                         ) : filteredRooms.length === 0 ? (
                             <div className="text-center py-8 text-gray-500">
@@ -801,9 +1038,6 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
                                                     )}
                                                 </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
-                                                    {/*<div>*/}
-                                                    {/*    <strong>Type:</strong> {room.room_type}*/}
-                                                    {/*</div>*/}
                                                     <div>
                                                         <strong>UUID:</strong> {room.room_uuid}
                                                     </div>

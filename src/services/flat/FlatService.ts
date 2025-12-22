@@ -196,4 +196,8 @@ export class FlatService {
     async getUserInOutAnalysis(roomUUID: string, token: string) {
         return this.room.getUserInOutAnalysis(roomUUID, token);
     }
+
+    async getCurrentMonthBillSummary(token: string) {
+        return this.room.getCurrentMonthBillSummary(token)
+    }
 }

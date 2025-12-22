@@ -4,7 +4,7 @@ import config from "@payload-config";
 export async function POST(request: NextRequest) {
     try {
         const payload = await getPayloadClient();
-        const { subscriptionId, duration, participantsCount = 0 } = await request.json();
+        const { subscriptionId, duration, participantsCount = 0, roomsCount = 1 } = await request.json();
 
         const subscription = await payload.findByID({
             collection: 'subscriptions',
@@ -28,10 +28,9 @@ export async function POST(request: NextRequest) {
         // Update usage
         const updatedUsage = {
             month: currentMonth,
-            roomsCreated: monthlyUsage.roomsCreated + 1,
-            totalDuration: monthlyUsage.totalDuration + duration,
-            totalMinutes: monthlyUsage.totalMinutes + duration,
-            participantsCount: monthlyUsage.participantsCount + participantsCount,
+            roomsCreated: roomsCount,
+            totalMinutes: duration,
+            participantsCount: participantsCount,
         };
 
         // Add to usage history

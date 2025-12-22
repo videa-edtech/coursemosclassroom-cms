@@ -33,7 +33,7 @@ export class AuthService {
     async sendVerificationCode(email: string): Promise<void> {
         try {
             console.log('Sending verification code to email:', email);
-            console.log('Using baseURL:', this.baseURL);
+            // console.log('Using baseURL:', this.baseURL);
 
             const requestData: SendVerificationCodeRequest = {
                 email: email,
@@ -69,7 +69,7 @@ export class AuthService {
     async register(credentials: RegisterRequest): Promise<FlatUser> {
         try {
             console.log('Registering new user with email:', credentials.email);
-            console.log('Using baseURL:', this.baseURL);
+            // console.log('Using baseURL:', this.baseURL);
 
             const response = await axios.post<RegisterResponse>(
                 `${this.baseURL}/v2/register/email`,
@@ -108,7 +108,7 @@ export class AuthService {
     async login(credentials: FlatLoginRequest): Promise<FlatUser> {
         try {
             console.log('Logging into Flat.io with email:', credentials.email);
-            console.log('Using baseURL:', this.baseURL);
+            // console.log('Using baseURL:', this.baseURL);
 
             const response = await axios.post<FlatLoginResponse>(
                 `${this.baseURL}/v2/login/email`,
@@ -119,7 +119,7 @@ export class AuthService {
                     }
                 }
             );
-
+            console.log(response)
             if (response.data.status !== 0) {
                 throw new Error('Login failed, please try again!');
             }
@@ -154,7 +154,7 @@ export class AuthService {
         try {
             console.log('Updating user information for UUID:', user_uuid);
             console.log('Updates:', updates);
-            console.log('Using baseURL:', this.baseURL);
+            // console.log('Using baseURL:', this.baseURL);
 
             // Chuẩn bị request data
             const requestData: UpdateInformationRequest = {
