@@ -218,7 +218,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                     {/* Tabs */}
                     <div className="border-b px-6 pt-4">
                         <div className="flex space-x-1">
-                            <button
+                            <button  type="button"
                                 onClick={() => setActiveTab('details')}
                                 className={`px-4 py-2 font-medium text-sm ${activeTab === 'details'
                                     ? 'text-blue-600 border-b-2 border-blue-600'
@@ -227,7 +227,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                             >
                                 Room Details
                             </button>
-                            <button
+                            <button  type="button"
                                 onClick={() => setActiveTab('participants')}
                                 className={`px-4 py-2 font-medium text-sm ${activeTab === 'participants'
                                     ? 'text-blue-600 border-b-2 border-blue-600'
@@ -508,6 +508,7 @@ type TimeRange = 'all' | 'month'
 export const CustomerAnalytics: React.FC = () => {
     const emailField = useFormFields(([fields]) => fields.email)
     const customerEmail = emailField?.value as string
+    const [userName, setUserName] = useState<string>('')
 
     const [isOpen, setIsOpen] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -522,6 +523,12 @@ export const CustomerAnalytics: React.FC = () => {
     const [selectedRoom, setSelectedRoom] = useState<RoomWithDetails | null>(null)
     const [showModal, setShowModal] = useState(false)
 
+    useEffect(() => {
+        if (customerEmail) {
+            const nameFromEmail = customerEmail.split('@')[0];
+            setUserName(nameFromEmail);
+        }
+    }, [customerEmail])
     useEffect(() => {
         if (isOpen) {
             fetchAnalyticsData()
@@ -552,13 +559,14 @@ export const CustomerAnalytics: React.FC = () => {
             setLoading(true)
             setError(null)
 
-            const result = await getAdminRoomsAction()
-            console.log('API Response:', result)
+            const result = await getAdminRoomsAction(userName)
+            console.log('API Response for user:', userName, result)
 
             if (result.success) {
                 // Lấy data từ response API
                 const roomsData = result.data?.list || []
-                console.log('Rooms data:', roomsData)
+                console.log(`Filtered rooms for ${userName}:`, roomsData)
+
 
                 const roomItems: RoomItem[] = roomsData.map((room: any) => {
                     const duration = calculateDuration(room.begin_time, room.end_time)
@@ -581,7 +589,7 @@ export const CustomerAnalytics: React.FC = () => {
             }
         } catch (e: any) {
             console.error('Error fetching analytics:', e)
-            setError("Có lỗi xảy ra khi kết nối server: " + e.message)
+            setError("Error server: " + e.message)
         } finally {
             setLoading(false)
         }
