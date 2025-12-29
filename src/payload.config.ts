@@ -13,7 +13,7 @@ import { Invoices } from './collections/Invoices'
 import { Meetings } from './collections/Meetings'
 import { Subscriptions } from './collections/Subscriptions'
 import { Plans } from './collections/Plans'
-
+import { CustomerAnalytics } from '@/../src/components/admin/CustomerAnalytics'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
@@ -23,6 +23,11 @@ export default buildConfig({
     importMap: {
       baseDir: path.resolve(dirname),
     },
+    components: {
+      CustomerAnalytics: {
+        Component: CustomerAnalytics
+      }
+    }
   },
   collections: [Users, Media, Customers, Subscriptions, Meetings, Invoices, Plans],
   editor: lexicalEditor(),

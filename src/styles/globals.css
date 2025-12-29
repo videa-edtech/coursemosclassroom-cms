@@ -264,3 +264,6 @@ body {
 body {
   position: relative;
 }
+.doc-controls,.date-time-picker__icon-wrap, .app-header,.template-default__nav-toggler-wrapper {
+  z-index: unset;
+}

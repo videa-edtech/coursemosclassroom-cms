@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { randomBytes } from 'crypto'
-
+import { CustomerAnalytics } from '@/../src/components/admin/CustomerAnalytics'
 export const Customers: CollectionConfig = {
     slug: 'customers',
     // Kích hoạt tính năng xác thực cho collection này
@@ -60,6 +60,16 @@ export const Customers: CollectionConfig = {
                 readOnly: true,
                 position: 'sidebar',
             },
+        },
+        {
+            name: 'analytics_view',
+            type: 'ui',
+            admin: {
+                position: 'sidebar',
+                components: {
+                    Field: CustomerAnalytics,
+                }
+            }
         },
     ],
     hooks: {

@@ -167,12 +167,15 @@ const RoomManagement: React.FC<RoomManagementProps> = ({ user, customerId }) => 
 
             setRealUsageSummary(realUsage);
             // Update subscription usage
-            await SubscriptionService.updateUsage(
-                subscriptionCheck?.subscription?.id.toString(),
-                totalMinutes,
-                0,
-                totalRoomsCount
-            );
+            if (subscriptionCheck?.subscription?.id) {
+                await SubscriptionService.updateUsage(
+                    subscriptionCheck?.subscription?.id.toString(),
+                    totalMinutes,
+                    0,
+                    totalRoomsCount
+                );
+            }
+
             console.log('Real usage summary:', realUsage);
 
         } catch (error: any) {
