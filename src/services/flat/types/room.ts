@@ -154,6 +154,8 @@ export interface UserInOutRecord {
     room_title: string;
     user_name: string;
     duration_minutes: number; // duration tính bằng phút
+    room_begin_time?: string;
+    room_end_time?: string;
 }
 
 export interface UserInOutResponse {
@@ -166,6 +168,8 @@ export interface UserInOutSummary {
     records: UserInOutRecord[];
     roomUUID: string;
     roomTitle: string;
+    begin_time?: string;
+    end_time?: string;
 }
 
 
