@@ -580,19 +580,27 @@ export class RoomService {
             }
 
             console.log('User in-out records fetched successfully:', {
-                recordsCount: response.data.data.length
+                recordsCount: response.data.data.length,
+                record: response.data
             });
 
             // Kiểm tra nếu có dữ liệu để lấy roomTitle
             const roomTitle = response.data.data.length > 0
                 ? response.data.data[0].room_title
                 : 'Unknown Room';
-
+            let begin_time = response.data.data.length > 0
+                ? response.data.data[0].room_begin_time
+                : 'Unknown';
+            let end_time = response.data.data.length > 0
+                ? response.data.data[0].room_end_time
+                : 'Unknown';
             return {
                 totalRecords: response.data.data.length,
                 records: response.data.data,
                 roomUUID: roomUUID,
-                roomTitle: roomTitle
+                roomTitle: roomTitle,
+                begin_time: begin_time,
+                end_time: end_time,
             };
 
         } catch (error: any) {
