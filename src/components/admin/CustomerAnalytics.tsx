@@ -69,14 +69,13 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
             const result = await getRoomDetailAction(room.roomUUID, token)
             if (result.success) {
                 // Set participants data
-                if (result.data.participants && Array.isArray(result.data.participants)) {
+                if (result.data?.participants && Array.isArray(result.data.participants)) {
                     setParticipants(result.data.participants)
                 }
-                // Set user in/out data
-                if (result.data.userInOut) {
+
+                if (result.data?.userInOut) {
                     let userInOutArray: any[] = [];
 
-                    // Xử lý nhiều định dạng response khác nhau
                     if (result.data.userInOut.records && Array.isArray(result.data.userInOut.records)) {
                         userInOutArray = result.data.userInOut.records;
                     }
@@ -109,6 +108,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                                     }
                                 } catch (e) {
                                     // Bỏ qua lỗi tính duration
+                                    console.warn('Error calculating duration:', e);
                                 }
                             }
 
@@ -582,7 +582,7 @@ export const CustomerAnalytics: React.FC = () => {
 
                 console.log('Processed rooms:', roomItems)
                 setRooms(roomItems)
-                setAdminToken(result.token)
+                setAdminToken(result.token || '')
                 setLastUpdated(new Date())
             } else {
                 setError("Failed to load rooms: " + (result.error || 'Unknown error'))
@@ -614,7 +614,7 @@ export const CustomerAnalytics: React.FC = () => {
                     console.log('Room detail result:', room.roomUUID, result)
 
                     if (result.success) {
-                        const participants = result.data.participants.participants || []
+                        const participants = result.data?.participants?.participants || []
                         const roomDetail: RoomWithDetails = {
                             roomUUID: room.roomUUID,
                             title: room.title,

@@ -15,7 +15,6 @@ export async function getAdminRoomsAction(userName?: string) {
     try {
         // 1. Login Admin
         const user = await flatService.login({
-            type: 'email',
             email: ADMIN_EMAIL,
             password: ADMIN_PASSWORD
         });

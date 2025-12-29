@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { randomBytes } from 'crypto'
 import { CustomerAnalytics } from '@/../src/components/admin/CustomerAnalytics'
+const typedCustomerAnalytics = CustomerAnalytics as any
 export const Customers: CollectionConfig = {
     slug: 'customers',
     // Kích hoạt tính năng xác thực cho collection này
@@ -67,7 +68,7 @@ export const Customers: CollectionConfig = {
             admin: {
                 position: 'sidebar',
                 components: {
-                    Field: CustomerAnalytics,
+                    Field: typedCustomerAnalytics,
                 }
             }
         },
