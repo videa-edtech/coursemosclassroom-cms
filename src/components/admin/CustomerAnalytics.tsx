@@ -15,6 +15,13 @@ interface RoomItem {
     participants?: number
 }
 
+interface RecordingItem {
+    id: string;
+    order: number;
+    url: string;
+    duration: number;
+}
+
 interface RoomWithDetails {
     roomUUID: string
     title: string
@@ -24,6 +31,8 @@ interface RoomWithDetails {
     duration: number
     participants: number
     participantsData?: any[]
+    hasRecord?: boolean
+    recordings?: RecordingItem[]
 }
 
 interface UserInOutRecord {
@@ -49,12 +58,19 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [userInOutData, setUserInOutData] = useState<UserInOutRecord[]>([])
-    const [activeTab, setActiveTab] = useState<'details' | 'participants'>('details')
+    const [activeTab, setActiveTab] = useState<'details' | 'participants' | 'recordings'>('details')
     const [participants, setParticipants] = useState<any[]>([])
+    const [recordings, setRecordings] = useState<RecordingItem[]>([])
+    const [recordingsLoading, setRecordingsLoading] = useState(false)
+    const [recordingsError, setRecordingsError] = useState<string | null>(null)
+    const [hasRecording, setHasRecording] = useState<boolean>(room.hasRecord || false)
 
     useEffect(() => {
         if (room && token) {
             fetchRoomDetails()
+            if (room.hasRecord) {
+                fetchRecordings()
+            }
         }
     }, [room.roomUUID, token])
 
@@ -67,6 +83,8 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
 
             // Fetch room detail with participants
             const result = await getRoomDetailAction(room.roomUUID, token)
+            console.log('Room detail API response:', JSON.stringify(result, null, 2)); // Thêm log để debug
+
             if (result.success) {
                 // Set participants data
                 if (result.data?.participants && Array.isArray(result.data.participants)) {
@@ -135,6 +153,35 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                     setUserInOutData([]);
                 }
 
+                // Check if room has recordings from the result
+                if (result.data?.details?.roomInfo?.hasRecord || result.data?.details?.hasRecord) {
+                    setHasRecording(true);
+                    // Extract recordings from result
+                    const roomRecordings = result.data?.details?.roomInfo?.records ||
+                        result.data?.details?.records ||
+                        [];
+
+                    console.log('Found recordings:', roomRecordings); // Thêm log để debug
+
+                    if (roomRecordings.length > 0) {
+                        const processedRecordings = roomRecordings.map((rec: any) => ({
+                            id: rec.id || rec.recording_id || String(Date.now()),
+                            order: rec.order || rec.recording_order || 0,
+                            url: rec.url || rec.file_url || '',
+                            duration: rec.duration || 0
+                        }));
+                        setRecordings(processedRecordings);
+                        console.log('Processed recordings:', processedRecordings); // Thêm log
+                    } else {
+                        console.log('No recordings found or empty array'); // Thêm log
+                    }
+                } else {
+                    // Nếu không có recording, reset state
+                    console.log('No hasRecord flag found'); // Thêm log
+                    setHasRecording(false);
+                    setRecordings([]);
+                }
+
             } else {
                 setError(result.error || 'Failed to load room details')
             }
@@ -145,6 +192,49 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
             setLoading(false)
         }
     }
+
+    const fetchRecordings = async () => {
+        if (!token) return
+
+        try {
+            setRecordingsLoading(true);
+            setRecordingsError(null);
+
+            const result = await getRoomDetailAction(room.roomUUID, token);
+
+            if (result.success) {
+                // Extract recordings from result
+                const roomRecordings = result.data?.details?.roomInfo?.records ||
+                    result.data?.details?.roomInfo?.records ||
+                    [];
+
+                if (roomRecordings.length > 0) {
+                    const processedRecordings = roomRecordings.map((rec: any) => ({
+                        id: rec.id || rec.recording_id || String(Date.now()),
+                        order: rec.order || rec.recording_order || 0,
+                        url: rec.url || rec.file_url || '',
+                        duration: rec.duration || 0
+                    }));
+                    setRecordings(processedRecordings);
+                    setHasRecording(true);
+                } else {
+                    setRecordings([]);
+                    setHasRecording(false);
+                }
+            } else {
+                setRecordingsError('Failed to load recording information');
+                setRecordings([]);
+                setHasRecording(false);
+            }
+        } catch (err: any) {
+            console.error('Error fetching recordings:', err);
+            setRecordingsError('Failed to load recording information: ' + err.message);
+            setRecordings([]);
+            setHasRecording(false);
+        } finally {
+            setRecordingsLoading(false);
+        }
+    };
 
     const formatDateTime = (dateString: string): string => {
         try {
@@ -167,11 +257,22 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
 
     const formatDuration = (minutes: number): string => {
         const hours = Math.floor(minutes / 60)
-        const mins = minutes % 60
+        const mins = Math.round(minutes % 60)
         if (hours > 0) {
             return `${hours}h ${mins}m`
         }
         return `${mins}m`
+    }
+
+    const formatSeconds = (seconds: number): string => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
     }
 
     const calculateStats = () => {
@@ -188,7 +289,34 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
         }
     }
 
+    const calculateRecordingStats = () => {
+        const totalDuration = recordings.reduce((sum, recording) => sum + recording.duration, 0);
+        const totalFiles = recordings.length;
+        const avgDuration = totalFiles > 0 ? totalDuration / totalFiles : 0;
+
+        return {
+            totalDuration,
+            totalFiles,
+            avgDuration
+        };
+    };
+
     const stats = calculateStats()
+    const recordingStats = calculateRecordingStats();
+
+    const handlePlayRecording = (url: string) => {
+        window.open(url, '_blank');
+    };
+
+    const handleDownloadRecording = (url: string, fileName: string) => {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName || 'recording.mp4';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[10000]">
@@ -201,6 +329,11 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                         </span></h3>
                         <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                             <span>Room ID: {room.roomUUID}</span>
+                            {hasRecording && (
+                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                                    Has Recording
+                                </span>
+                            )}
                         </div>
                     </div>
                     <button
@@ -218,16 +351,16 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                     {/* Tabs */}
                     <div className="border-b px-6 pt-4">
                         <div className="flex space-x-1">
-                            <button  type="button"
-                                onClick={() => setActiveTab('details')}
-                                className={`px-4 py-2 font-medium text-sm ${activeTab === 'details'
-                                    ? 'text-blue-600 border-b-2 border-blue-600'
-                                    : 'text-gray-600 hover:text-gray-800'
-                                }`}
+                            <button type="button"
+                                    onClick={() => setActiveTab('details')}
+                                    className={`px-4 py-2 font-medium text-sm ${activeTab === 'details'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-gray-600 hover:text-gray-800'
+                                    }`}
                             >
                                 Room Details
                             </button>
-                            {/*<button  type="button"*/}
+                            {/*<button type="button"*/}
                             {/*    onClick={() => setActiveTab('participants')}*/}
                             {/*    className={`px-4 py-2 font-medium text-sm ${activeTab === 'participants'*/}
                             {/*        ? 'text-blue-600 border-b-2 border-blue-600'*/}
@@ -236,6 +369,15 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                             {/*>*/}
                             {/*    Participants ({participants.length})*/}
                             {/*</button>*/}
+                            <button type="button"
+                                    onClick={() => setActiveTab('recordings')}
+                                    className={`px-4 py-2 font-medium text-sm ${activeTab === 'recordings'
+                                        ? 'text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-gray-600 hover:text-gray-800'
+                                    }`}
+                            >
+                                Recordings ({recordings.length})
+                            </button>
                         </div>
                     </div>
 
@@ -421,6 +563,140 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                                     </div>
                                 )}
                             </div>
+                        ) : activeTab === 'recordings' ? (
+                            <div>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h4 className="font-semibold text-gray-700">Session Recordings</h4>
+                                    <button
+                                        onClick={fetchRecordings}
+                                        disabled={recordingsLoading}
+                                        className="px-3 py-1 bg-blue-50 text-blue-600 rounded text-sm hover:bg-blue-100 flex items-center space-x-1"
+                                    >
+                                        <svg className={`w-4 h-4 ${recordingsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        <span>Refresh</span>
+                                    </button>
+                                </div>
+
+                                {recordingsLoading ? (
+                                    <div className="text-center py-8">
+                                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                                        <p className="text-gray-500">Loading recording information...</p>
+                                    </div>
+                                ) : recordingsError ? (
+                                    <div className="text-center py-8">
+                                        <div className="text-red-500 mb-4">
+                                            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <p className="text-red-600 mb-2">{recordingsError}</p>
+                                        <p className="text-sm text-gray-500">Please try again later</p>
+                                    </div>
+                                ) : recordings.length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <div className="text-gray-400 mb-4">
+                                            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                        <p className="text-gray-600 mb-2">No recordings available for this session</p>
+                                        <p className="text-sm text-gray-400">Recordings may take some time to process after the session ends</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        {/* Recording Stats */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                            <div className="bg-blue-50 p-4 rounded-lg">
+                                                <div className="text-2xl font-bold text-blue-600">
+                                                    {recordings.length}
+                                                </div>
+                                                <div className="text-sm text-gray-600">Recording Files</div>
+                                            </div>
+                                            <div className="bg-green-50 p-4 rounded-lg">
+                                                <div className="text-2xl font-bold text-green-600">
+                                                    {formatSeconds(recordingStats.totalDuration)}
+                                                </div>
+                                                <div className="text-sm text-gray-600">Total Duration</div>
+                                            </div>
+                                            <div className="bg-purple-50 p-4 rounded-lg">
+                                                <div className="text-2xl font-bold text-purple-600">
+                                                    {formatSeconds(recordingStats.avgDuration)}
+                                                </div>
+                                                <div className="text-sm text-gray-600">Avg File Duration</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Recording List */}
+                                        <div>
+                                            <h5 className="font-medium text-gray-700 mb-3">Recording Files</h5>
+                                            <div className="space-y-3">
+                                                {recordings.map((recording, index) => (
+                                                    <div key={recording.id} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center space-x-2">
+                                                                    <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full">
+                                                                        {index + 1}
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="font-medium text-gray-800">
+                                                                            Recording #{recording.order + 1}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-500">
+                                                                            File ID: {recording.id}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div className="text-sm font-semibold text-green-600">
+                                                                    {formatSeconds(recording.duration)}
+                                                                </div>
+                                                                <div className="text-xs text-gray-500">
+                                                                    Duration
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="mt-3 text-sm text-gray-600 break-all">
+                                                            <div className="font-medium mb-1">URL:</div>
+                                                            <div className="bg-white p-2 rounded border text-xs font-mono break-all">
+                                                                {recording.url}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="mt-4 flex space-x-2">
+                                                            <button
+                                                                onClick={() => handlePlayRecording(recording.url)}
+                                                                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                <span>Play Recording</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDownloadRecording(recording.url, `${room.title}_recording_${index + 1}.mp4`)}
+                                                                className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                                </svg>
+                                                                <span>Download</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+
+                                    </div>
+                                )}
+                            </div>
                         ) : (
                             <div>
                                 <h4 className="font-semibold text-gray-700 mb-4">Room Participants</h4>
@@ -488,8 +764,29 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({ room, onClose, token 
                 </div>
 
                 {/* Modal Footer */}
-                <div className="p-6 border-t flex justify-end items-center">
+                <div className="p-6 border-t flex justify-between items-center">
+                    <div className="text-sm text-gray-500">
+                        {activeTab === 'recordings' && hasRecording && (
+                            <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                Recording available
+                            </span>
+                        )}
+                    </div>
                     <div className="flex space-x-3">
+                        {activeTab === 'recordings' && recordings.length > 0 && (
+                            <button
+                                onClick={() => handlePlayRecording(recordings[0].url)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                </svg>
+                                <span>Play First Recording</span>
+                            </button>
+                        )}
                         <button
                             onClick={onClose}
                             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
@@ -615,6 +912,9 @@ export const CustomerAnalytics: React.FC = () => {
 
                     if (result.success) {
                         const participants = result.data?.participants?.participants || []
+                        const hasRecord = result.data?.details?.roomInfo?.hasRecord || result.data?.details?.roomInfo?.hasRecord || false
+                        const roomRecordings = result.data?.details?.roomInfo?.records || result.data?.details?.roomInfo?.records || []
+
                         const roomDetail: RoomWithDetails = {
                             roomUUID: room.roomUUID,
                             title: room.title,
@@ -623,7 +923,14 @@ export const CustomerAnalytics: React.FC = () => {
                             roomStatus: room.roomStatus,
                             duration: room.duration,
                             participants: participants.length,
-                            participantsData: participants
+                            participantsData: participants,
+                            hasRecord: hasRecord,
+                            recordings: roomRecordings.length > 0 ? roomRecordings.map((rec: any) => ({
+                                id: rec.id || rec.recording_id || String(Date.now()),
+                                order: rec.order || rec.recording_order || 0,
+                                url: rec.url || rec.file_url || '',
+                                duration: rec.duration || 0
+                            })) : []
                         }
                         roomsDetails.push(roomDetail)
                     } else {
@@ -686,6 +993,10 @@ export const CustomerAnalytics: React.FC = () => {
 
     const getTotalDuration = (): number => {
         return roomsWithDetails.reduce((sum, room) => sum + room.duration, 0)
+    }
+
+    const getRoomsWithRecordingsCount = (): number => {
+        return roomsWithDetails.filter(room => room.hasRecord).length
     }
 
     const handleRoomClick = (room: RoomWithDetails) => {
@@ -866,7 +1177,6 @@ export const CustomerAnalytics: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Stats Grid */}
 
 
                             {/* Detailed Statistics */}
@@ -882,7 +1192,7 @@ export const CustomerAnalytics: React.FC = () => {
 
                                 {roomsWithDetails.length > 0 ? (
                                     <div className="space-y-6">
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
                                             <div className="p-4 bg-blue-50 rounded-lg">
                                                 <div className="text-2xl font-bold text-blue-600">
                                                     {getStoppedRoomsCount()}
@@ -907,6 +1217,12 @@ export const CustomerAnalytics: React.FC = () => {
                                                 </div>
                                                 <div className="text-sm text-gray-600">Avg Session Duration</div>
                                             </div>
+                                            <div className="bg-indigo-50 p-4 rounded-lg text-center">
+                                                <div className="text-2xl font-bold text-indigo-600">
+                                                    {getRoomsWithRecordingsCount()}
+                                                </div>
+                                                <div className="text-sm text-gray-600">Rooms with Recordings</div>
+                                            </div>
                                         </div>
 
                                         <div className="border-t pt-6">
@@ -926,6 +1242,11 @@ export const CustomerAnalytics: React.FC = () => {
                                                         <div className="flex-1">
                                                             <div className="font-medium text-sm flex items-center gap-2">
                                                                 {room.title}
+                                                                {room.hasRecord && (
+                                                                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                                                                        Recording
+                                                                    </span>
+                                                                )}
                                                                 <span className="hidden group-hover:inline text-xs text-blue-600">
                                                                     Click to view details →
                                                                 </span>

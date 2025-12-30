@@ -94,6 +94,7 @@ export interface RoomInfoResponse {
             inviteCode: string;
             isPmi: boolean;
             isAI: boolean;
+            records?:any;
         };
     };
 }

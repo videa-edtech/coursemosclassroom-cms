@@ -51,15 +51,17 @@ export async function getAdminRoomsAction(userName?: string) {
 
 export async function getRoomDetailAction(roomUUID: string, token: string) {
     try {
-        const [participants, userInOut] = await Promise.all([
+        const [participants, userInOut, details] = await Promise.all([
             flatService.getAllRoomParticipants(roomUUID, token),
-            flatService.getAllRoomUserInOut(roomUUID, token)
+            flatService.getAllRoomUserInOut(roomUUID, token),
+            flatService.getRoomInfo(roomUUID, token)
         ]);
         return {
             success: true,
             data: {
                 participants: JSON.parse(JSON.stringify(participants)),
-                userInOut: JSON.parse(JSON.stringify(userInOut))
+                userInOut: JSON.parse(JSON.stringify(userInOut)),
+                details: JSON.parse(JSON.stringify(details)),
             }
         };
     } catch (error: any) {
